@@ -3,7 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { campusEntries } from "./campus-data";
 import { hashPassword } from "./password";
-import type { Profile, PublicUser, Role, StoredCampusEntry, UserStatus } from "./types";
+import type { CourseAssignment, CourseMaterial, CourseQuiz, Profile, PublicUser, QuizAttempt, Role, StoredCampusEntry, Submission, UserStatus } from "./types";
 
 // Simple JSON-file store for local use. Swap for a real database before deploying to serverless hosts.
 
@@ -11,11 +11,18 @@ export type User = Omit<PublicUser, keyof Profile | "status"> & Partial<Profile>
 
 export const AVATAR_COLORS = ["indigo", "violet", "emerald", "amber", "rose", "sky", "slate"];
 
-type Db = {
+export type Db = {
   secret: string;
   users: User[];
   campus: StoredCampusEntry[];
+  materials: CourseMaterial[];
+  assignments: CourseAssignment[];
+  submissions: Submission[];
+  quizzes: CourseQuiz[];
+  quizAttempts: QuizAttempt[];
 };
+
+const COLLECTIONS = ["materials", "assignments", "submissions", "quizzes", "quizAttempts"] as const;
 
 const DB_PATH = process.env.CAMPUSAI_DB_PATH || path.join(process.cwd(), "data", "db.json");
 
@@ -50,12 +57,19 @@ async function seed(): Promise<Db> {
     secret: crypto.randomBytes(32).toString("hex"),
     users: [admin],
     campus: campusEntries.map((e) => ({ ...e, id: crypto.randomUUID() })),
+    materials: [],
+    assignments: [],
+    submissions: [],
+    quizzes: [],
+    quizAttempts: [],
   };
 }
 
 async function load(): Promise<Db> {
   try {
-    return JSON.parse(await fs.readFile(DB_PATH, "utf8")) as Db;
+    const db = JSON.parse(await fs.readFile(DB_PATH, "utf8")) as Db;
+    for (const key of COLLECTIONS) db[key] ??= [];
+    return db;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     const db = await seed();

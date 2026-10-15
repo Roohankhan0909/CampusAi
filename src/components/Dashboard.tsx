@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { logout } from "@/app/actions/auth";
-import type { AiMode, Assignment, PublicUser, StoredCampusEntry } from "@/lib/types";
+import { openCourseDeadlines } from "@/lib/coursework";
+import type { AiMode, Assignment, PublicUser, StoredCampusEntry, StudentCourseWork } from "@/lib/types";
 import { KEYS, relativeTime } from "@/lib/planner";
+import { CourseDeadlines } from "@/lib/usePlannerSnapshot";
 import { StorageScope } from "@/lib/useLocalStorage";
 import Avatar from "./Avatar";
 import Icon, { type IconName } from "./Icon";
@@ -13,11 +15,13 @@ import Home from "./Home";
 import StudyAssistant from "./StudyAssistant";
 import CampusHelper from "./CampusHelper";
 import Planner from "./Planner";
+import StudentCourses from "./course/StudentCourses";
 
-export type Tab = "home" | "study" | "campus" | "planner";
+export type Tab = "home" | "courses" | "study" | "campus" | "planner";
 
 const NAV: { id: Tab; label: string; icon: IconName; subtitle: string }[] = [
   { id: "home", label: "Overview", icon: "home", subtitle: "Your day at a glance" },
+  { id: "courses", label: "My courses", icon: "courses", subtitle: "Materials, assignments, and quizzes from your teachers" },
   { id: "study", label: "Study Assistant", icon: "study", subtitle: "Chat, summarize notes, flashcards, and quizzes" },
   { id: "campus", label: "Campus Helper", icon: "campus", subtitle: "Courses, events, and facilities" },
   { id: "planner", label: "Planner", icon: "planner", subtitle: "AI study plan, assignments, and timetable" },
@@ -36,7 +40,7 @@ function useDeadlineNotifications(userId: string) {
   }, [userId]);
 }
 
-export default function Dashboard({ user, campus, teachers }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[] }) {
+export default function Dashboard({ user, campus, teachers, work }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; work: StudentCourseWork }) {
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<AiMode | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
@@ -52,10 +56,13 @@ export default function Dashboard({ user, campus, teachers }: { user: PublicUser
       .catch(() => setMode("offline"));
   }, []);
 
+  const deadlines = useMemo(() => openCourseDeadlines(work), [work]);
+  const nav = NAV.filter((n) => n.id !== "courses" || user.role === "student");
   const current = NAV.find((n) => n.id === tab)!;
 
   return (
     <StorageScope.Provider value={user.id}>
+    <CourseDeadlines.Provider value={deadlines}>
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0">
         <div className="flex items-center gap-2 px-5 py-5">
@@ -63,7 +70,7 @@ export default function Dashboard({ user, campus, teachers }: { user: PublicUser
           <Wordmark />
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:pb-0">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <button
               key={n.id}
               onClick={() => setTab(n.id)}
@@ -73,6 +80,9 @@ export default function Dashboard({ user, campus, teachers }: { user: PublicUser
             >
               <Icon name={n.icon} />
               {n.label}
+              {n.id === "courses" && deadlines.length > 0 && (
+                <span className="ml-auto rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold text-[#0a0a0a]">{deadlines.length}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -112,11 +122,13 @@ export default function Dashboard({ user, campus, teachers }: { user: PublicUser
           <p className="text-sm text-slate-500">{current.subtitle}</p>
         </header>
         {tab === "home" && <Home user={user} campus={campus} teachers={teachers} onNavigate={setTab} />}
+        {tab === "courses" && <StudentCourses user={user} work={work} />}
         {tab === "study" && <StudyAssistant />}
         {tab === "campus" && <CampusHelper campus={campus} />}
         {tab === "planner" && <Planner />}
       </main>
     </div>
+    </CourseDeadlines.Provider>
     </StorageScope.Provider>
   );
 }

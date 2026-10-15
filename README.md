@@ -9,10 +9,11 @@ All-in-one student dashboard built with Next.js, TypeScript, and Tailwind.
 
 - **Accounts**: one login page for students, teachers, and admins, each sent to their own portal. Sign-up offers "I'm a student" or "I'm a teacher". Teacher accounts stay pending until an admin approves them.
 - **Teacher portal** (`/teacher`): courses, and students matched by shared course codes, with their profiles.
+- **Course workspace** (`/teacher/course/<CODE>`): teachers post materials (PDFs, slides, docs, images or links), assignments with due dates and optional attachments, and multiple-choice quizzes (written by hand or drafted by AI from notes). They review submissions, grade with feedback, and see quiz scores. Students see their courses' content in the **My courses** tab, submit work, and take auto-graded quizzes; open course deadlines also show on the Overview and Planner.
 - **Admin panel** (`/admin`): stats, teacher approvals, user management (create users, set roles, edit details), and a campus content editor.
 - **Profiles** (`/profile`): department, bio, courses, office hours, and password change.
 
-Accounts and campus content are stored in `data/db.json` (created on first run, gitignored). Planner data and chats are stored per user in the browser's localStorage.
+Accounts, campus content, and course content are stored in `data/db.json` (created on first run, gitignored); uploaded files go in `data/uploads/` (max 10 MB each, served only to the course's teachers and enrolled students). Planner data and chats are stored per user in the browser's localStorage.
 
 Default admin login: `admin@campusai.edu` / `admin12345` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before first run). The JSON file store won't persist on serverless hosts like Vercel; switch to a real database before deploying.
 

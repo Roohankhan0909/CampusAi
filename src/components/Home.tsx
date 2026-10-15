@@ -2,6 +2,8 @@
 
 import { DAYS, KEYS, dueStatus, formatDateTime, relativeTime, seedAssignments, seedClasses, sortByDue, toLocalDate } from "@/lib/planner";
 import type { Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
+import { useContext } from "react";
+import { CourseDeadlines } from "@/lib/usePlannerSnapshot";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import type { Tab } from "./Dashboard";
 import Avatar from "./Avatar";
@@ -10,6 +12,7 @@ import StatusBadge from "./StatusBadge";
 export default function Home({ user, campus, teachers, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; onNavigate: (tab: Tab) => void }) {
   const [classes] = useLocalStorage<ClassSession[]>(KEYS.classes, seedClasses);
   const [assignments, setAssignments] = useLocalStorage<Assignment[]>(KEYS.assignments, seedAssignments);
+  const courseDeadlines = useContext(CourseDeadlines);
   const name = user.name.split(" ")[0];
 
   const now = new Date();
@@ -19,8 +22,11 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
   const todaysClasses = classes.filter((c) => c.day === today).sort((a, b) => a.start.localeCompare(b.start));
   const pending = sortByDue(assignments.filter((a) => !a.done));
   const weekAhead = now.getTime() + 7 * 86400000;
-  const dueThisWeek = pending.filter((a) => new Date(a.due).getTime() <= weekAhead).length;
-  const overdue = pending.filter((a) => dueStatus(a) === "overdue").length;
+  const fromCourses = courseDeadlines.map((d): Assignment => ({ id: d.id, title: d.kind === "quiz" ? `Quiz: ${d.title}` : d.title, course: d.course, due: d.due, priority: "high", done: false }));
+  const courseIds = new Set(fromCourses.map((a) => a.id));
+  const upcoming = sortByDue([...pending, ...fromCourses]);
+  const dueThisWeek = upcoming.filter((a) => new Date(a.due).getTime() <= weekAhead).length;
+  const overdue = upcoming.filter((a) => dueStatus(a) === "overdue").length;
   const completion = assignments.length ? Math.round((assignments.filter((a) => a.done).length / assignments.length) * 100) : 0;
   const todayStr = toLocalDate(now);
   const events = campus
@@ -96,13 +102,19 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
               View all
             </button>
           </div>
-          {pending.length === 0 ? (
+          {upcoming.length === 0 ? (
             <p className="text-sm text-slate-500">All caught up!</p>
           ) : (
             <ul className="space-y-3">
-              {pending.slice(0, 5).map((a) => (
+              {upcoming.slice(0, 5).map((a) => (
                 <li key={a.id} className="flex items-start gap-3">
-                  <input type="checkbox" checked={a.done} onChange={() => toggle(a.id)} className="mt-1 h-4 w-4 accent-indigo-600" aria-label={`Mark ${a.title} done`} />
+                  {courseIds.has(a.id) ? (
+                    <button onClick={() => onNavigate("courses")} className="mt-0.5 shrink-0 rounded border border-indigo-400 px-1 text-[10px] font-semibold text-indigo-700 uppercase" title="Posted by your teacher">
+                      Open
+                    </button>
+                  ) : (
+                    <input type="checkbox" checked={a.done} onChange={() => toggle(a.id)} className="mt-1 h-4 w-4 accent-indigo-600" aria-label={`Mark ${a.title} done`} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{a.title}</p>
                     <p className="text-xs text-slate-500" title={formatDateTime(a.due)}>

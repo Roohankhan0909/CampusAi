@@ -10,7 +10,15 @@ export const dynamic = "force-dynamic";
 
 export default async function TeacherPage() {
   const teacher = await requireRole("teacher");
-  const students = (await readDb()).users.map(toPublicUser).filter((u) => u.role === "student" && u.status === "active" && sharedCourses(u.courses, teacher.courses).length > 0);
+  const db = await readDb();
+  const workload = Object.fromEntries(
+    teacher.courses.map((c) => {
+      const assignments = db.assignments.filter((a) => a.course === c);
+      const ids = new Set(assignments.map((a) => a.id));
+      return [c, { posts: db.materials.filter((m) => m.course === c).length + assignments.length + db.quizzes.filter((q) => q.course === c).length, toGrade: db.submissions.filter((s) => ids.has(s.assignmentId) && !s.grade).length }];
+    }),
+  );
+  const students = db.users.map(toPublicUser).filter((u) => u.role === "student" && u.status === "active" && sharedCourses(u.courses, teacher.courses).length > 0);
   return (
     <div className="min-h-screen">
       <PortalHeader
@@ -21,7 +29,7 @@ export default async function TeacherPage() {
           { href: "/", label: "AI dashboard" },
         ]}
       />
-      <TeacherPortal teacher={teacher} students={students} />
+      <TeacherPortal teacher={teacher} students={students} workload={workload} />
     </div>
   );
 }
