@@ -25,7 +25,12 @@ export type Assignment = {
   due: string;
   priority: Priority;
   done: boolean;
+  steps?: Step[];
 };
+
+export type Step = { id: string; text: string; done: boolean };
+
+export type Flashcard = { front: string; back: string };
 
 export type CampusCategory = "course" | "event" | "facility" | "faq";
 
@@ -37,14 +42,19 @@ export type CampusEntry = {
   date?: string;
 };
 
-export type AiMode = "openai" | "offline";
+export type AiMode = "ai" | "offline";
 
-export type AiTask = "chat" | "summarize" | "quiz" | "campus";
+export type AiTask = "chat" | "summarize" | "quiz" | "campus" | "flashcards" | "plan" | "breakdown" | "campusDraft";
+
+export type PlannerData = { classes: ClassSession[]; assignments: Assignment[]; now: string };
 
 export type AiResponse = {
   mode: AiMode;
   text?: string;
   quiz?: QuizQuestion[];
+  flashcards?: Flashcard[];
+  steps?: string[];
+  draft?: { details: string; tags: string[] };
   error?: string;
 };
 

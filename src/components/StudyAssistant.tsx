@@ -5,9 +5,11 @@ import { callAi } from "@/lib/api";
 import { KEYS } from "@/lib/planner";
 import type { ChatMessage, QuizQuestion } from "@/lib/types";
 import { useLocalStorage } from "@/lib/useLocalStorage";
+import { usePlannerSnapshot } from "@/lib/usePlannerSnapshot";
 import Chat from "./Chat";
+import Flashcards from "./Flashcards";
 
-type Sub = "chat" | "summarize" | "quiz";
+type Sub = "chat" | "summarize" | "flashcards" | "quiz";
 
 const SAMPLE_NOTES =
   "Photosynthesis is the process plants use to convert light energy into chemical energy. It takes place mainly in the chloroplasts of leaf cells. Chlorophyll is the green pigment that absorbs light, mostly in the blue and red wavelengths. The light-dependent reactions occur in the thylakoid membranes and produce ATP and NADPH while releasing oxygen from water. The Calvin cycle occurs in the stroma and uses ATP and NADPH to fix carbon dioxide into glucose. Factors such as light intensity, carbon dioxide concentration, and temperature affect the rate of photosynthesis.";
@@ -17,6 +19,7 @@ export default function StudyAssistant() {
   const tabs: { id: Sub; label: string }[] = [
     { id: "chat", label: "Chat" },
     { id: "summarize", label: "Summarize notes" },
+    { id: "flashcards", label: "Flashcards" },
     { id: "quiz", label: "Quiz me" },
   ];
 
@@ -35,6 +38,7 @@ export default function StudyAssistant() {
       </div>
       {sub === "chat" && <StudyChat />}
       {sub === "summarize" && <Summarizer />}
+      {sub === "flashcards" && <FlashcardsTab />}
       {sub === "quiz" && <QuizMaker />}
     </div>
   );
@@ -43,13 +47,14 @@ export default function StudyAssistant() {
 function StudyChat() {
   const [messages, setMessages] = useLocalStorage<ChatMessage[]>(KEYS.studyChat, []);
   const [loading, setLoading] = useState(false);
+  const snapshot = usePlannerSnapshot();
 
   const send = async (text: string) => {
     const next: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(next);
     setLoading(true);
     try {
-      const res = await callAi({ task: "chat", messages: next });
+      const res = await callAi({ task: "chat", messages: next, planner: snapshot() });
       setMessages([...next, { role: "assistant", content: res.text ?? "" }]);
     } catch (e) {
       setMessages([...next, { role: "assistant", content: `Sorry, something went wrong: ${(e as Error).message}` }]);
@@ -65,8 +70,8 @@ function StudyChat() {
       onClear={() => setMessages([])}
       loading={loading}
       placeholder="Ask anything about your studies…"
-      emptyTitle="Ask a question, get an explanation, or ask for study tips."
-      suggestions={["How should I prepare for midterms?", "I keep procrastinating. Help!", "Explain recursion simply", "How do I remember what I read?"]}
+      emptyTitle="Ask a question, get an explanation, or ask about your own deadlines and classes."
+      suggestions={["What's due this week?", "What should I work on first?", "Explain recursion simply", "How should I prepare for midterms?"]}
     />
   );
 }
@@ -93,6 +98,11 @@ function NotesInput({ notes, setNotes }: { notes: string; setNotes: (v: string) 
       <p className="text-xs text-slate-400">{notes.trim() ? notes.trim().split(/\s+/).length : 0} words</p>
     </div>
   );
+}
+
+function FlashcardsTab() {
+  const [notes, setNotes] = useLocalStorage<string>(KEYS.notes, "");
+  return <Flashcards notes={notes} notesInput={<NotesInput notes={notes} setNotes={setNotes} />} />;
 }
 
 function Summarizer() {

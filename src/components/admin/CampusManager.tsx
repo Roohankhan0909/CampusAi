@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { deleteCampusEntry, saveCampusEntry } from "@/app/actions/admin";
+import { callAi } from "@/lib/api";
 import type { CampusCategory, StoredCampusEntry } from "@/lib/types";
 
 const CATEGORIES: { id: CampusCategory; label: string }[] = [
@@ -91,6 +92,27 @@ export default function CampusManager({ entries }: { entries: StoredCampusEntry[
 function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone: (message?: string) => void }) {
   const [state, action, pending] = useActionState(saveCampusEntry, undefined);
   const [category, setCategory] = useState<CampusCategory>(entry?.category ?? "event");
+  const [title, setTitle] = useState(entry?.title ?? "");
+  const [details, setDetails] = useState(entry?.details ?? "");
+  const [tags, setTags] = useState(entry?.tags.join(", ") ?? "");
+  const [drafting, setDrafting] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  const draft = async () => {
+    setDrafting(true);
+    setAiError("");
+    try {
+      const res = await callAi({ task: "campusDraft", input: title, category });
+      if (res.draft) {
+        setDetails(res.draft.details);
+        setTags(res.draft.tags.join(", "));
+      }
+    } catch (e) {
+      setAiError((e as Error).message);
+    } finally {
+      setDrafting(false);
+    }
+  };
 
   useEffect(() => {
     if (state?.success) onDone(state.success);
@@ -110,9 +132,16 @@ function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone:
         </select>
         {category === "event" ? <input type="date" name="date" defaultValue={entry?.date} required className="input" aria-label="Event date" /> : <div />}
       </div>
-      <input name="title" defaultValue={entry?.title} placeholder="Title" required className="input w-full" aria-label="Title" />
-      <textarea name="details" defaultValue={entry?.details} placeholder="Details (hours, location, description…)" required rows={5} className="input w-full resize-y" aria-label="Details" />
-      <input name="tags" defaultValue={entry?.tags.join(", ")} placeholder="Tags, comma separated (helps search)" className="input w-full" aria-label="Tags" />
+      <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required className="input w-full" aria-label="Title" />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-400">Type a title, then let AI write the details.</span>
+        <button type="button" onClick={draft} disabled={drafting || title.trim().length < 3} className="chip disabled:opacity-50">
+          {drafting ? "Writing…" : "✨ Write with AI"}
+        </button>
+      </div>
+      {aiError && <p className="text-xs text-red-600">{aiError}</p>}
+      <textarea name="details" value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Details (hours, location, description…)" required rows={5} className="input w-full resize-y" aria-label="Details" />
+      <input name="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags, comma separated (helps search)" className="input w-full" aria-label="Tags" />
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <div className="flex gap-2">
         <button type="submit" disabled={pending} className="btn-primary">

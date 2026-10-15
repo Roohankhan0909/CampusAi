@@ -1,10 +1,12 @@
-import type { AiResponse, AiTask, ChatMessage } from "./types";
+import type { AiResponse, AiTask, ChatMessage, PlannerData } from "./types";
 
 type AiRequest = {
   task: AiTask;
   input?: string;
   messages?: ChatMessage[];
   count?: number;
+  planner?: PlannerData;
+  category?: string;
 };
 
 export async function callAi(body: AiRequest): Promise<AiResponse> {

@@ -1,4 +1,4 @@
-import type { Assignment, ClassSession } from "./types";
+import type { Assignment, ClassSession, PlannerData } from "./types";
 
 export const KEYS = {
   classes: "campusai.classes",
@@ -7,6 +7,8 @@ export const KEYS = {
   campusChat: "campusai.campusChat",
   notes: "campusai.notes",
   reminders: "campusai.reminders",
+  flashcards: "campusai.flashcards",
+  studyPlan: "campusai.studyPlan",
 };
 
 export const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -76,4 +78,22 @@ export function formatDateTime(iso: string): string {
 
 export function sortByDue(list: Assignment[]): Assignment[] {
   return [...list].sort((a, b) => Number(a.done) - Number(b.done) || a.due.localeCompare(b.due));
+}
+
+export function plannerContext({ classes, assignments, now }: PlannerData): string {
+  const nowMs = new Date(now).getTime();
+  const timetable = WEEK_ORDER.map((d) => {
+    const list = classes.filter((c) => c.day === d).sort((a, b) => a.start.localeCompare(b.start));
+    return `${DAYS[d]}: ${list.length ? list.map((c) => `${c.start}-${c.end} ${c.course}${c.location ? ` (${c.location})` : ""}`).join("; ") : "no classes"}`;
+  }).join("\n");
+  const pending = sortByDue(assignments.filter((a) => !a.done));
+  const tasks = pending.length
+    ? pending
+        .map((a) => {
+          const steps = a.steps?.length ? ` [${a.steps.filter((s) => s.done).length}/${a.steps.length} steps done]` : "";
+          return `- ${a.title}${a.course ? ` (${a.course})` : ""}: due ${formatDateTime(a.due)} (${relativeTime(a.due, nowMs)}), ${a.priority} priority${dueStatus(a, nowMs) === "overdue" ? ", OVERDUE" : ""}${steps}`;
+        })
+        .join("\n")
+    : "none";
+  return `Current local time: ${formatDateTime(now)} (${DAYS[new Date(now).getDay()]})\n\nWeekly timetable:\n${timetable}\n\nPending assignments:\n${tasks}\n\nCompleted assignments: ${assignments.length - pending.length}`;
 }

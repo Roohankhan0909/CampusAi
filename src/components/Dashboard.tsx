@@ -16,9 +16,9 @@ export type Tab = "home" | "study" | "campus" | "planner";
 
 const NAV: { id: Tab; label: string; icon: IconName; subtitle: string }[] = [
   { id: "home", label: "Overview", icon: "home", subtitle: "Your day at a glance" },
-  { id: "study", label: "Study Assistant", icon: "study", subtitle: "Chat, summarize notes, and quiz yourself" },
+  { id: "study", label: "Study Assistant", icon: "study", subtitle: "Chat, summarize notes, flashcards, and quizzes" },
   { id: "campus", label: "Campus Helper", icon: "campus", subtitle: "Courses, events, and facilities" },
-  { id: "planner", label: "Planner", icon: "planner", subtitle: "Timetable, assignments, and deadlines" },
+  { id: "planner", label: "Planner", icon: "planner", subtitle: "AI study plan, assignments, and timetable" },
 ];
 
 function useDeadlineNotifications(userId: string) {
@@ -37,12 +37,16 @@ function useDeadlineNotifications(userId: string) {
 export default function Dashboard({ user, campus }: { user: PublicUser; campus: StoredCampusEntry[] }) {
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<AiMode | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
   useDeadlineNotifications(user.id);
 
   useEffect(() => {
     fetch("/api/ai")
       .then((r) => r.json())
-      .then((d: { mode: AiMode }) => setMode(d.mode))
+      .then((d: { mode: AiMode; provider: string | null }) => {
+        setMode(d.mode);
+        setProvider(d.provider);
+      })
       .catch(() => setMode("offline"));
   }, []);
 
@@ -93,10 +97,10 @@ export default function Dashboard({ user, campus }: { user: PublicUser; campus: 
           {mode && (
             <div className="hidden rounded-xl bg-slate-50 p-3 text-xs text-slate-600 md:block">
               <div className="flex items-center gap-2 font-semibold">
-                <span className={`h-2 w-2 rounded-full ${mode === "openai" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                {mode === "openai" ? "AI: connected" : "AI: offline mode"}
+                <span className={`h-2 w-2 rounded-full ${mode === "ai" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                {mode === "ai" ? `AI: connected${provider ? ` (${provider})` : ""}` : "AI: offline mode"}
               </div>
-              {mode === "offline" && <p className="mt-1">Set OPENAI_API_KEY to enable full AI answers.</p>}
+              {mode === "offline" && <p className="mt-1">Set AI_API_KEY (free Groq or Gemini key) to enable full AI answers.</p>}
             </div>
           )}
         </div>

@@ -17,8 +17,16 @@ Default admin login: `admin@campusai.edu` / `admin12345` (override with `ADMIN_E
 
 ```bash
 npm install
-cp .env.local.example .env.local   # optional: add OPENAI_API_KEY
+cp .env.local.example .env.local   # optional: add AI_API_KEY
 npm run dev
 ```
 
-If `OPENAI_API_KEY` isn't set, the AI features run in **offline mode**: summaries, quizzes, and campus answers are generated locally, and the chat gives preset study tips. `OPENAI_BASE_URL` and `OPENAI_MODEL` let you point it at any OpenAI-compatible API.
+Set `AI_API_KEY` to a free **Groq** (`gsk_...`) or **Gemini** (`AIza...`) key, or an OpenAI key; the provider is detected from the key. `AI_MODEL` and `AI_BASE_URL` let you point it at any OpenAI-compatible API. Without a key, the AI features run in **offline mode**: summaries, flashcards, quizzes, study plans, step breakdowns and campus answers are generated locally, and the chat answers questions about your planner and gives preset study tips.
+
+### AI features
+- **Study chat** that knows your timetable and deadlines ("What's due this week?")
+- **Notes**: summaries, flashcards, and quizzes
+- **AI study plan**: a 7-day plan built around your classes and deadlines (Planner tab)
+- **Break down**: splits an assignment into a checklist of steps
+- **Campus helper** answering from admin-managed campus content
+- **Admin AI writer**: drafts campus entry details and tags from a title

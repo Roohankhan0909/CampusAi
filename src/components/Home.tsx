@@ -51,7 +51,7 @@ export default function Home({ user, campus, onNavigate }: { user: PublicUser; c
             Ask the study assistant
           </button>
           <button onClick={() => onNavigate("planner")} className="rounded-xl bg-white/15 px-4 py-2 text-sm font-medium hover:bg-white/25">
-            Add a deadline
+            Plan my week with AI
           </button>
         </div>
       </section>

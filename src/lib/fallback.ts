@@ -1,4 +1,5 @@
-import type { CampusEntry, QuizQuestion } from "./types";
+import { DAYS, dueStatus, formatDateTime, relativeTime, sortByDue, toLocalDate } from "./planner";
+import type { CampusEntry, Flashcard, PlannerData, QuizQuestion } from "./types";
 
 // Lightweight offline "AI" used when no LLM API key is configured.
 
@@ -152,5 +153,105 @@ export function offlineStudyReply(message: string): string {
   const lower = message.toLowerCase();
   const tip = STUDY_TIPS.find((t) => t.keys.some((k) => lower.includes(k)));
   if (tip) return tip.reply;
-  return "I'm running in offline mode, so open-ended answers are limited. I can still:\n• Give study tips (try asking about exams, focus, memory, essays, or time management)\n• Summarize notes (Summarize tab)\n• Generate practice quizzes (Quiz tab)\n\nSet OPENAI_API_KEY on the server to enable full AI chat.";
+  return "I'm running in offline mode, so open-ended answers are limited. I can still:\n• Give study tips (try asking about exams, focus, memory, essays, or time management)\n• Summarize notes (Summarize tab)\n• Generate practice quizzes (Quiz tab)\n\nAsk me what's due this week or what classes you have today. Add a free Groq or Gemini key (AI_API_KEY) to enable full AI chat.";
+}
+
+export function makeFlashcards(text: string, count: number): Flashcard[] {
+  const freq = wordFreq(text);
+  const ranked = rankSentences(text).sort((a, b) => b.score - a.score);
+  const cards: Flashcard[] = [];
+  const used = new Set<string>();
+  for (const { s } of ranked) {
+    if (cards.length >= count) break;
+    const def = s.match(/^(.{3,60}?)\s+(is|are|refers to|means)\s+(.+)$/i);
+    if (def && !used.has(def[1].toLowerCase())) {
+      used.add(def[1].toLowerCase());
+      const verb = def[2].toLowerCase() === "are" ? "are" : "is";
+      cards.push({ front: `What ${verb} ${def[1].replace(/^(the|a|an)\s+/i, "").replace(/^./, (c) => c.toLowerCase())}?`, back: s });
+      continue;
+    }
+    const term = tokenize(s)
+      .filter((w) => freq.has(w) && w.length > 3 && !used.has(w))
+      .sort((a, b) => (freq.get(b) ?? 0) - (freq.get(a) ?? 0))[0];
+    if (!term || /^(it|this|that|they|these|those)\b/i.test(s)) continue;
+    used.add(term);
+    const re = new RegExp(`\\b${term.replace(/[-']/g, "\\$&")}\\b`, "i");
+    cards.push({ front: s.replace(re, "_____"), back: `${s.match(re)?.[0] ?? term}\n\n${s}` });
+  }
+  return cards;
+}
+
+const dayMs = 86400000;
+
+export function plannerAnswer(question: string, data: PlannerData): string | null {
+  const q = question.toLowerCase();
+  const now = new Date(data.now);
+  const nowMs = now.getTime();
+  const pending = sortByDue(data.assignments.filter((a) => !a.done));
+  const fmt = (list: typeof pending) => list.map((a) => `• ${a.title}${a.course ? ` (${a.course})` : ""}: ${formatDateTime(a.due)}, ${relativeTime(a.due, nowMs)}`).join("\n");
+
+  if (/overdue|late|missed/.test(q)) {
+    const list = pending.filter((a) => dueStatus(a, nowMs) === "overdue");
+    return list.length ? `Overdue:\n${fmt(list)}` : "Nothing is overdue. Nice work!";
+  }
+  if (/due|deadline|assignment|homework|task|week|tomorrow|next/.test(q) && !/class|lecture/.test(q)) {
+    const horizon = /tomorrow/.test(q) ? 2 : /today/.test(q) ? 1 : 7;
+    const list = pending.filter((a) => new Date(a.due).getTime() - nowMs <= horizon * dayMs);
+    const label = horizon === 1 ? "today" : horizon === 2 ? "by tomorrow" : "in the next 7 days";
+    return list.length ? `Due ${label}:\n${fmt(list)}` : `Nothing due ${label}.${pending[0] ? ` Next up: ${pending[0].title}, ${relativeTime(pending[0].due, nowMs)}.` : ""}`;
+  }
+  if (/class|lecture|schedule|timetable|today|tomorrow/.test(q)) {
+    const day = /tomorrow/.test(q) ? (now.getDay() + 1) % 7 : now.getDay();
+    const list = data.classes.filter((c) => c.day === day).sort((a, b) => a.start.localeCompare(b.start));
+    return list.length
+      ? `Classes on ${DAYS[day]}:\n${list.map((c) => `• ${c.start}-${c.end} ${c.course}${c.location ? `, ${c.location}` : ""}`).join("\n")}`
+      : `No classes on ${DAYS[day]}.`;
+  }
+  return null;
+}
+
+const SESSIONS = { high: 3, medium: 2, low: 1 } as const;
+
+export function offlineStudyPlan(data: PlannerData): string {
+  const now = new Date(data.now);
+  const pending = sortByDue(data.assignments.filter((a) => !a.done)).filter((a) => new Date(a.due).getTime() > now.getTime());
+  if (pending.length === 0) return "You have no upcoming assignments. Use this week to review notes from each class and make flashcards.";
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    return { date: toLocalDate(d), day: d.getDay(), tasks: [] as string[] };
+  });
+  for (const a of pending) {
+    const dueDate = a.due.slice(0, 10);
+    const avail = days.filter((d) => d.date < dueDate || (d.date === dueDate && Number(a.due.slice(11, 13)) >= 18));
+    const slots = avail.length ? avail : [days[0]];
+    const n = Math.min(SESSIONS[a.priority], slots.length);
+    for (let i = 0; i < n; i++) {
+      const target = [...slots].sort((x, y) => x.tasks.length - y.tasks.length)[0];
+      const step = a.steps?.filter((s) => !s.done)[i]?.text;
+      target.tasks.push(`${a.title}${a.course ? ` (${a.course})` : ""}${step ? `: ${step}` : ""}`);
+    }
+  }
+  return `Your 7-day study plan\n\n${days
+    .map((d, i) => {
+      const classes = data.classes.filter((c) => c.day === d.day).sort((a, b) => a.end.localeCompare(b.end));
+      const after = classes.length ? `after ${classes[classes.length - 1].end}` : "any time";
+      const label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : DAYS[d.day];
+      return `${label} (${d.date}), ${classes.length} class${classes.length === 1 ? "" : "es"}, study ${after}\n${d.tasks.length ? d.tasks.map((t) => `• 45 min: ${t}`).join("\n") : "• Free: light review or rest"}`;
+    })
+    .join("\n\n")}\n\nTip: high-priority tasks get 3 sessions, medium 2, low 1. Finish each task a day early.`;
+}
+
+const STEP_TEMPLATES: { keys: string[]; steps: string[] }[] = [
+  { keys: ["essay", "paper", "report", "draft", "write"], steps: ["Re-read the prompt and rubric", "Research and collect 3-5 sources", "Write a one-sentence thesis", "Outline main points with evidence", "Write the rough draft", "Revise structure and argument", "Proofread and format citations"] },
+  { keys: ["lab", "code", "program", "project"], steps: ["Read the requirements carefully", "Set up files and environment", "Build the simplest working version", "Add remaining features", "Test edge cases", "Clean up and comment code", "Write up results and submit"] },
+  { keys: ["problem", "set", "homework", "exercise", "worksheet"], steps: ["Skim all problems and mark the hard ones", "Review relevant lecture notes and examples", "Solve the easier problems first", "Work through the hard problems", "Check answers and units", "Write up neatly and submit"] },
+  { keys: ["exam", "test", "midterm", "final", "quiz"], steps: ["List all topics covered", "Rate your confidence on each topic", "Review weak topics with notes", "Make flashcards for key terms", "Do practice questions or past papers", "Final light review the day before"] },
+  { keys: ["read", "chapter", "article"], steps: ["Skim headings and summary", "Read actively and take notes", "Write a short summary", "List questions to ask in class"] },
+  { keys: ["presentation", "slides", "talk"], steps: ["Define the main message", "Research and outline", "Build slides", "Write speaker notes", "Rehearse twice with a timer"] },
+];
+
+export function offlineBreakdown(title: string): string[] {
+  const lower = title.toLowerCase();
+  return (STEP_TEMPLATES.find((t) => t.keys.some((k) => lower.includes(k))) ?? { steps: ["Clarify what's required", "Gather materials and notes", "Do the first half", "Do the second half", "Review and submit"] }).steps;
 }

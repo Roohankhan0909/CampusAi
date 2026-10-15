@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { DAYS, KEYS, WEEK_ORDER, dueStatus, formatDateTime, newId, relativeTime, seedAssignments, seedClasses, sortByDue } from "@/lib/planner";
+import { callAi } from "@/lib/api";
 import type { Assignment, ClassSession, Priority } from "@/lib/types";
+import { usePlannerSnapshot } from "@/lib/usePlannerSnapshot";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import StatusBadge from "./StatusBadge";
 
@@ -11,9 +13,64 @@ const PRIORITY_DOT: Record<Priority, string> = { low: "bg-slate-300", medium: "b
 export default function Planner() {
   return (
     <div className="space-y-6">
+      <AiPlan />
       <Assignments />
       <Timetable />
     </div>
+  );
+}
+
+function AiPlan() {
+  const [plan, setPlan] = useLocalStorage<{ text: string; created: string } | null>(KEYS.studyPlan, null);
+  const [prefs, setPrefs] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const snapshot = usePlannerSnapshot();
+
+  const run = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await callAi({ task: "plan", input: prefs, planner: snapshot() });
+      setPlan({ text: res.text ?? "", created: new Date().toISOString() });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-5 text-white">
+        <h3 className="text-base font-semibold">AI study plan</h3>
+        <p className="mt-1 text-sm text-indigo-100">Builds a 7-day plan around your classes and deadlines.</p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={prefs}
+            onChange={(e) => setPrefs(e.target.value)}
+            placeholder="Preferences (optional), e.g. I study best in the evening, max 3 hours a day"
+            className="flex-1 rounded-xl border-0 bg-white/15 px-3 py-2 text-sm text-white placeholder:text-indigo-200 outline-none focus:bg-white/25"
+            aria-label="Study plan preferences"
+          />
+          <button onClick={run} disabled={loading} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60">
+            {loading ? "Planning…" : plan ? "Regenerate plan" : "Generate my study plan"}
+          </button>
+        </div>
+      </div>
+      {error && <p className="px-5 pt-4 text-sm text-red-600">{error}</p>}
+      {plan && (
+        <div className="p-5">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs text-slate-400">Generated {formatDateTime(plan.created)}</p>
+            <button onClick={() => setPlan(null)} className="text-xs text-slate-400 hover:text-red-600">
+              Clear
+            </button>
+          </div>
+          <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{plan.text}</div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -22,6 +79,21 @@ function Assignments() {
   const [reminders, setReminders] = useLocalStorage<boolean>(KEYS.reminders, false);
   const [filter, setFilter] = useState<"pending" | "done" | "all">("pending");
   const [form, setForm] = useState({ title: "", course: "", due: "", priority: "medium" as Priority });
+  const [breaking, setBreaking] = useState<string | null>(null);
+
+  const update = (id: string, fn: (a: Assignment) => Assignment) => setAssignments((list) => list.map((x) => (x.id === id ? fn(x) : x)));
+
+  const breakDown = async (a: Assignment) => {
+    setBreaking(a.id);
+    try {
+      const res = await callAi({ task: "breakdown", input: `${a.title}${a.course ? ` (${a.course})` : ""}, due ${formatDateTime(a.due)}` });
+      update(a.id, (x) => ({ ...x, steps: (res.steps ?? []).map((text) => ({ id: newId(), text, done: false })) }));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBreaking(null);
+    }
+  };
 
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -82,11 +154,12 @@ function Assignments() {
 
       <ul className="divide-y divide-slate-100">
         {shown.map((a) => (
-          <li key={a.id} className="flex items-center gap-3 py-3">
+          <li key={a.id} className="py-3">
+            <div className="flex items-center gap-3">
             <input
               type="checkbox"
               checked={a.done}
-              onChange={() => setAssignments((list) => list.map((x) => (x.id === a.id ? { ...x, done: !x.done } : x)))}
+              onChange={() => update(a.id, (x) => ({ ...x, done: !x.done }))}
               className="h-4 w-4 accent-indigo-600"
               aria-label={`Mark ${a.title} done`}
             />
@@ -99,9 +172,42 @@ function Assignments() {
               </p>
             </div>
             <StatusBadge status={dueStatus(a)} />
+            {!a.done && !a.steps?.length && (
+              <button onClick={() => breakDown(a)} disabled={breaking !== null} className="chip disabled:opacity-50" aria-label={`Break down ${a.title}`}>
+                {breaking === a.id ? "Thinking…" : "✨ Break down"}
+              </button>
+            )}
             <button onClick={() => setAssignments((list) => list.filter((x) => x.id !== a.id))} className="text-xs text-slate-400 hover:text-red-600" aria-label={`Delete ${a.title}`}>
               Delete
             </button>
+            </div>
+            {!!a.steps?.length && (
+              <div className="mt-2 ml-11 rounded-xl bg-slate-50 p-3">
+                <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    Steps: {a.steps.filter((s) => s.done).length}/{a.steps.length} done
+                  </span>
+                  <button onClick={() => update(a.id, (x) => ({ ...x, steps: [] }))} className="hover:text-red-600">
+                    Remove steps
+                  </button>
+                </div>
+                <ul className="space-y-1.5">
+                  {a.steps.map((s) => (
+                    <li key={s.id}>
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={s.done}
+                          onChange={() => update(a.id, (x) => ({ ...x, steps: x.steps?.map((y) => (y.id === s.id ? { ...y, done: !y.done } : y)) }))}
+                          className="mt-0.5 h-3.5 w-3.5 accent-indigo-600"
+                        />
+                        <span className={s.done ? "text-slate-400 line-through" : "text-slate-700"}>{s.text}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </li>
         ))}
         {shown.length === 0 && <li className="py-3 text-sm text-slate-400">Nothing here.</li>}
