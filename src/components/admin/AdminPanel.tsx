@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { logout } from "@/app/actions/auth";
 import type { PublicUser, StoredCampusEntry } from "@/lib/types";
-import Icon from "../Icon";
+import Avatar from "../Avatar";
+import PortalHeader from "../PortalHeader";
+import RoleBadge from "../RoleBadge";
 import CampusManager from "./CampusManager";
 import UserManager from "./UserManager";
 
@@ -18,6 +18,7 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
   const stats = [
     { label: "Total users", value: users.length },
     { label: "Students", value: users.filter((u) => u.role === "student").length },
+    { label: "Teachers", value: users.filter((u) => u.role === "teacher").length },
     { label: "Admins", value: users.filter((u) => u.role === "admin").length },
     { label: "New this week", value: users.filter((u) => new Date(u.createdAt).getTime() >= weekAgo).length },
     { label: "Campus entries", value: campus.length },
@@ -33,31 +34,28 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 md:px-8">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">
-              <Icon name="sparkle" />
-            </div>
-            <span className="text-lg font-bold">CampusAI</span>
-            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">ADMIN</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-slate-500 sm:inline">{admin.email}</span>
-            <Link href="/" className="btn-ghost">
-              Student dashboard
-            </Link>
-            <form action={logout}>
-              <button className="btn-ghost">Log out</button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <PortalHeader
+        user={admin}
+        badge="admin"
+        links={[
+          { href: "/profile", label: "My profile" },
+          { href: "/", label: "Student dashboard" },
+        ]}
+      />
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        <div>
-          <h1 className="text-2xl font-bold">Admin panel</h1>
-          <p className="text-sm text-slate-500">Manage users and the campus information students see.</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Admin panel</h1>
+            <p className="text-sm text-slate-500">Manage students, teachers, and the campus information students see.</p>
+          </div>
+          <a href="/profile" className="card flex items-center gap-3 p-3 pr-4 hover:border-indigo-200">
+            <Avatar name={admin.name} color={admin.avatarColor} />
+            <div>
+              <p className="text-sm font-medium">{admin.name}</p>
+              <p className="text-xs text-slate-500">{admin.department || "Administrator"} · Edit profile</p>
+            </div>
+          </a>
         </div>
 
         <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1">
@@ -74,7 +72,7 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
 
         {section === "overview" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
               {stats.map((s) => (
                 <div key={s.label} className="card p-4">
                   <p className="text-xs text-slate-500">{s.label}</p>
@@ -87,9 +85,14 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
               <ul className="divide-y divide-slate-100">
                 {recent.map((u) => (
                   <li key={u.id} className="flex items-center justify-between py-2.5 text-sm">
-                    <div>
-                      <p className="font-medium">{u.name}</p>
-                      <p className="text-xs text-slate-500">{u.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar name={u.name} color={u.avatarColor} size="sm" />
+                      <div>
+                        <p className="font-medium">
+                          {u.name} <RoleBadge role={u.role} />
+                        </p>
+                        <p className="text-xs text-slate-500">{u.email}</p>
+                      </div>
                     </div>
                     <span className="text-xs text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</span>
                   </li>

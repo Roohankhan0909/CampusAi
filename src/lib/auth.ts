@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { readDb, toPublicUser } from "./db";
-import type { PublicUser } from "./types";
+import type { PublicUser, Role } from "./types";
 
 const COOKIE = "campusai_session";
 const MAX_AGE = 7 * 24 * 3600;
@@ -50,8 +50,16 @@ export async function requireUser(): Promise<PublicUser> {
   return user;
 }
 
-export async function requireAdmin(): Promise<PublicUser> {
+export function homeFor(role: Role): string {
+  return role === "admin" ? "/admin" : role === "teacher" ? "/teacher" : "/";
+}
+
+export async function requireRole(...roles: Role[]): Promise<PublicUser> {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/");
+  if (!roles.includes(user.role)) redirect(homeFor(user.role));
   return user;
+}
+
+export async function requireAdmin(): Promise<PublicUser> {
+  return requireRole("admin");
 }

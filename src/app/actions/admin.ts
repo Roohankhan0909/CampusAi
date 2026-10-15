@@ -3,14 +3,59 @@
 import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { updateDb } from "@/lib/db";
+import { parseCourses } from "@/lib/courses";
+import { newUser, updateDb } from "@/lib/db";
+import { hashPassword } from "@/lib/password";
 import type { CampusCategory, FormState, Role } from "@/lib/types";
 
 const CATEGORIES: CampusCategory[] = ["course", "event", "facility", "faq"];
+const ROLES: Role[] = ["student", "teacher", "admin"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const field = (formData: FormData, name: string, max = 500) => String(formData.get(name) ?? "").trim().slice(0, max);
+
+export async function createUser(_: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const name = field(formData, "name", 80);
+  const email = field(formData, "email", 200).toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const role = field(formData, "role") as Role;
+  if (name.length < 2) return { error: "Please enter a name." };
+  if (!EMAIL_RE.test(email)) return { error: "Please enter a valid email." };
+  if (password.length < 8) return { error: "Temporary password must be at least 8 characters." };
+  if (!ROLES.includes(role)) return { error: "Choose a role." };
+
+  const passwordHash = await hashPassword(password);
+  const created = await updateDb((db) => {
+    if (db.users.some((u) => u.email === email)) return false;
+    db.users.push(
+      newUser(name, email, passwordHash, role, {
+        department: field(formData, "department", 100),
+        courses: parseCourses(field(formData, "courses")),
+        officeHours: field(formData, "officeHours", 200),
+      }),
+    );
+    return true;
+  });
+  if (!created) return { error: "An account with this email already exists." };
+  revalidatePath("/admin");
+  return { success: `${name} added as ${role}.` };
+}
+
+export async function updateUserDetails(userId: string, details: { department: string; courses: string; officeHours: string }) {
+  await requireAdmin();
+  await updateDb((db) => {
+    const user = db.users.find((u) => u.id === userId);
+    if (!user) return;
+    user.department = String(details.department ?? "").trim().slice(0, 100);
+    user.courses = parseCourses(String(details.courses ?? "").slice(0, 500));
+    user.officeHours = String(details.officeHours ?? "").trim().slice(0, 200);
+  });
+  revalidatePath("/admin");
+}
 
 export async function setUserRole(userId: string, role: Role) {
   const admin = await requireAdmin();
-  if (userId === admin.id || !["student", "admin"].includes(role)) return;
+  if (userId === admin.id || !ROLES.includes(role)) return;
   await updateDb((db) => {
     const user = db.users.find((u) => u.id === userId);
     if (user) user.role = role;

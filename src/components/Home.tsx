@@ -4,9 +4,10 @@ import { DAYS, KEYS, dueStatus, formatDateTime, relativeTime, seedAssignments, s
 import type { Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import type { Tab } from "./Dashboard";
+import Avatar from "./Avatar";
 import StatusBadge from "./StatusBadge";
 
-export default function Home({ user, campus, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; onNavigate: (tab: Tab) => void }) {
+export default function Home({ user, campus, teachers, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; onNavigate: (tab: Tab) => void }) {
   const [classes] = useLocalStorage<ClassSession[]>(KEYS.classes, seedClasses);
   const [assignments, setAssignments] = useLocalStorage<Assignment[]>(KEYS.assignments, seedAssignments);
   const name = user.name.split(" ")[0];
@@ -141,6 +142,45 @@ export default function Home({ user, campus, onNavigate }: { user: PublicUser; c
           )}
         </section>
       </div>
+
+      <section className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="section-title">My teachers</h3>
+          <a href="/profile" className="text-xs font-medium text-indigo-600 hover:underline">
+            {user.courses.length ? "Edit my courses" : "Add my courses"}
+          </a>
+        </div>
+        {user.courses.length === 0 ? (
+          <p className="text-sm text-slate-500">Add the courses you&apos;re enrolled in on your profile to see your teachers here.</p>
+        ) : teachers.length === 0 ? (
+          <p className="text-sm text-slate-500">No teachers found yet for {user.courses.join(", ")}.</p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {teachers.map((t) => (
+              <li key={t.id} className="flex gap-3 rounded-xl border border-slate-200 p-3">
+                <Avatar name={t.name} color={t.avatarColor} />
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-medium">{t.name}</p>
+                  {t.department && <p className="text-xs text-slate-500">{t.department}</p>}
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {t.courses
+                      .filter((c) => user.courses.includes(c))
+                      .map((c) => (
+                        <span key={c} className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                          {c}
+                        </span>
+                      ))}
+                  </div>
+                  {t.officeHours && <p className="mt-1 text-xs text-slate-500">Office hours: {t.officeHours}</p>}
+                  <a href={`mailto:${t.email}`} className="mt-1 block truncate text-xs text-indigo-600 hover:underline">
+                    {t.email}
+                  </a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

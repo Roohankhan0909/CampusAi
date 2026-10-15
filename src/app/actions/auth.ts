@@ -1,9 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, homeFor } from "@/lib/auth";
 import { newUser, readDb, updateDb } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { parseCourses } from "@/lib/courses";
 import type { FormState } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,7 +19,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
     return { error: "Invalid email or password." };
   }
   await createSession(user.id);
-  redirect(user.role === "admin" ? "/admin" : "/");
+  redirect(homeFor(user.role));
 }
 
 export async function signup(_: FormState, formData: FormData): Promise<FormState> {
@@ -35,7 +36,7 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
   const passwordHash = await hashPassword(password);
   const user = await updateDb((db) => {
     if (db.users.some((u) => u.email === email)) return null;
-    const created = newUser(name, email, passwordHash);
+    const created = newUser(name, email, passwordHash, "student", { courses: parseCourses(field(formData, "courses")) });
     db.users.push(created);
     return created;
   });

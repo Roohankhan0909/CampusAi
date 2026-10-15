@@ -8,6 +8,6 @@ const Dashboard = dynamic(() => import("./Dashboard"), {
   loading: () => <div className="flex min-h-screen items-center justify-center text-slate-400">Loading CampusAI…</div>,
 });
 
-export default function ClientDashboard(props: { user: PublicUser; campus: StoredCampusEntry[] }) {
+export default function ClientDashboard(props: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[] }) {
   return <Dashboard {...props} />;
 }

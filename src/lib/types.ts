@@ -60,7 +60,7 @@ export type AiResponse = {
 
 export type StoredCampusEntry = CampusEntry & { id: string };
 
-export type Role = "student" | "admin";
+export type Role = "student" | "teacher" | "admin";
 
 export type PublicUser = {
   id: string;
@@ -68,6 +68,14 @@ export type PublicUser = {
   email: string;
   role: Role;
   createdAt: string;
+} & Profile;
+
+export type Profile = {
+  department: string;
+  bio: string;
+  courses: string[];
+  officeHours: string;
+  avatarColor: string;
 };
 
 export type FormState = { error?: string; success?: string } | undefined;

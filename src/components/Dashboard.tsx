@@ -6,7 +6,9 @@ import { logout } from "@/app/actions/auth";
 import type { AiMode, Assignment, PublicUser, StoredCampusEntry } from "@/lib/types";
 import { KEYS, relativeTime } from "@/lib/planner";
 import { StorageScope } from "@/lib/useLocalStorage";
+import Avatar from "./Avatar";
 import Icon, { type IconName } from "./Icon";
+import Logo from "./Logo";
 import Home from "./Home";
 import StudyAssistant from "./StudyAssistant";
 import CampusHelper from "./CampusHelper";
@@ -34,7 +36,7 @@ function useDeadlineNotifications(userId: string) {
   }, [userId]);
 }
 
-export default function Dashboard({ user, campus }: { user: PublicUser; campus: StoredCampusEntry[] }) {
+export default function Dashboard({ user, campus, teachers }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[] }) {
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<AiMode | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
@@ -57,9 +59,7 @@ export default function Dashboard({ user, campus }: { user: PublicUser; campus: 
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white">
-            <Icon name="sparkle" />
-          </div>
+          <Logo />
           <span className="text-lg font-bold">CampusAI</span>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:pb-0">
@@ -77,19 +77,19 @@ export default function Dashboard({ user, campus }: { user: PublicUser; campus: 
           ))}
         </nav>
         <div className="mt-auto space-y-3 p-4">
-          {user.role === "admin" && (
-            <Link href="/admin" className="flex items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
-              Admin panel
+          {user.role !== "student" && (
+            <Link href={user.role === "admin" ? "/admin" : "/teacher"} className="flex items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              {user.role === "admin" ? "Admin panel" : "Teacher portal"}
             </Link>
           )}
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-              {user.name.slice(0, 1).toUpperCase()}
-            </div>
+            <Link href="/profile" className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80" title="My profile">
+            <Avatar name={user.name} color={user.avatarColor} size="sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{user.name}</p>
               <p className="truncate text-xs text-slate-500">{user.email}</p>
             </div>
+            </Link>
             <form action={logout}>
               <button className="text-xs font-medium text-slate-500 hover:text-red-600">Log out</button>
             </form>
@@ -111,7 +111,7 @@ export default function Dashboard({ user, campus }: { user: PublicUser; campus: 
           <h1 className="text-2xl font-bold">{current.label}</h1>
           <p className="text-sm text-slate-500">{current.subtitle}</p>
         </header>
-        {tab === "home" && <Home user={user} campus={campus} onNavigate={setTab} />}
+        {tab === "home" && <Home user={user} campus={campus} teachers={teachers} onNavigate={setTab} />}
         {tab === "study" && <StudyAssistant />}
         {tab === "campus" && <CampusHelper campus={campus} />}
         {tab === "planner" && <Planner />}

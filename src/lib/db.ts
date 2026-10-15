@@ -3,11 +3,13 @@ import { promises as fs } from "fs";
 import path from "path";
 import { campusEntries } from "./campus-data";
 import { hashPassword } from "./password";
-import type { PublicUser, Role, StoredCampusEntry } from "./types";
+import type { Profile, PublicUser, Role, StoredCampusEntry } from "./types";
 
 // Simple JSON-file store for local use. Swap for a real database before deploying to serverless hosts.
 
-export type User = PublicUser & { passwordHash: string };
+export type User = Omit<PublicUser, keyof Profile> & Partial<Profile> & { passwordHash: string };
+
+export const AVATAR_COLORS = ["indigo", "violet", "emerald", "amber", "rose", "sky", "slate"];
 
 type Db = {
   secret: string;
@@ -66,19 +68,30 @@ export function readDb(): Promise<Db> {
   return withLock(load);
 }
 
-export function updateDb<T>(fn: (db: Db) => T): Promise<T> {
+export function updateDb<T>(fn: (db: Db) => T | Promise<T>): Promise<T> {
   return withLock(async () => {
     const db = await load();
-    const result = fn(db);
+    const result = await fn(db);
     await save(db);
     return result;
   });
 }
 
-export function toPublicUser({ id, name, email, role, createdAt }: User): PublicUser {
-  return { id, name, email, role, createdAt };
+export function toPublicUser({ id, name, email, role, createdAt, department, bio, courses, officeHours, avatarColor }: User): PublicUser {
+  return {
+    id,
+    name,
+    email,
+    role,
+    createdAt,
+    department: department ?? "",
+    bio: bio ?? "",
+    courses: courses ?? [],
+    officeHours: officeHours ?? "",
+    avatarColor: avatarColor && AVATAR_COLORS.includes(avatarColor) ? avatarColor : "indigo",
+  };
 }
 
-export function newUser(name: string, email: string, passwordHash: string, role: Role = "student"): User {
-  return { id: crypto.randomUUID(), name, email, passwordHash, role, createdAt: new Date().toISOString() };
+export function newUser(name: string, email: string, passwordHash: string, role: Role = "student", profile: Partial<Profile> = {}): User {
+  return { id: crypto.randomUUID(), name, email, passwordHash, role, createdAt: new Date().toISOString(), ...profile };
 }
