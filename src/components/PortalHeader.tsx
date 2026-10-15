@@ -2,16 +2,16 @@ import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import type { PublicUser } from "@/lib/types";
 import Avatar from "./Avatar";
-import Logo from "./Logo";
+import Logo, { Wordmark } from "./Logo";
 
 export default function PortalHeader({ user, badge, links }: { user: PublicUser; badge?: string; links: { href: string; label: string }[] }) {
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="border-b border-slate-200 bg-[#0d0d0d]">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-8">
         <Link href="/" className="flex items-center gap-2">
           <Logo />
-          <span className="text-lg font-bold">CampusAI</span>
-          {badge && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white uppercase">{badge}</span>}
+          <Wordmark />
+          {badge && <span className="rounded-full border border-indigo-300 px-2 py-0.5 text-[10px] font-semibold tracking-[0.12em] text-indigo-600 uppercase">{badge}</span>}
         </Link>
         <details className="group relative">
           <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl p-1.5 pr-3 hover:bg-slate-100" aria-label="Account menu">

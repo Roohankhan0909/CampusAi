@@ -18,6 +18,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return { error: "Invalid email or password." };
   }
+  if (user.status === "pending") return { error: "Your teacher account is waiting for an administrator to approve it." };
   await createSession(user.id);
   redirect(homeFor(user.role));
 }
@@ -33,14 +34,20 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
   if (password !== confirm) return { error: "Passwords don't match." };
 
+  const asTeacher = field(formData, "role") === "teacher";
   const passwordHash = await hashPassword(password);
   const user = await updateDb((db) => {
     if (db.users.some((u) => u.email === email)) return null;
-    const created = newUser(name, email, passwordHash, "student", { courses: parseCourses(field(formData, "courses")) });
+    const created = newUser(name, email, passwordHash, asTeacher ? "teacher" : "student", {
+      courses: parseCourses(field(formData, "courses")),
+      department: field(formData, "department").slice(0, 80),
+      status: asTeacher ? "pending" : "active",
+    });
     db.users.push(created);
     return created;
   });
   if (!user) return { error: "An account with this email already exists." };
+  if (user.status === "pending") return { success: "Thanks! Your teacher account has been created and is waiting for an administrator to approve it. You can log in once it's approved." };
 
   await createSession(user.id);
   redirect("/");

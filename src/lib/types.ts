@@ -62,11 +62,14 @@ export type StoredCampusEntry = CampusEntry & { id: string };
 
 export type Role = "student" | "teacher" | "admin";
 
+export type UserStatus = "active" | "pending";
+
 export type PublicUser = {
   id: string;
   name: string;
   email: string;
   role: Role;
+  status: UserStatus;
   createdAt: string;
 } & Profile;
 

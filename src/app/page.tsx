@@ -8,6 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const user = await requireUser();
   const { campus, users } = await readDb();
-  const teachers = users.map(toPublicUser).filter((u) => u.role === "teacher" && u.id !== user.id && sharedCourses(u.courses, user.courses).length > 0);
+  const teachers = users.map(toPublicUser).filter((u) => u.role === "teacher" && u.status === "active" && u.id !== user.id && sharedCourses(u.courses, user.courses).length > 0);
   return <ClientDashboard user={user} campus={campus} teachers={teachers} />;
 }

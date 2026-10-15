@@ -1,9 +1,9 @@
 import type { Role } from "@/lib/types";
 
 const STYLES: Record<Role, string> = {
-  admin: "bg-slate-900 text-white",
-  teacher: "bg-emerald-100 text-emerald-700",
-  student: "bg-indigo-50 text-indigo-700",
+  admin: "bg-indigo-600 text-[#0a0a0a]",
+  teacher: "border border-indigo-400 text-indigo-700",
+  student: "bg-slate-100 text-slate-700",
 };
 
 export default function RoleBadge({ role }: { role: Role }) {

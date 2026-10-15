@@ -42,18 +42,18 @@ function AiPlan() {
 
   return (
     <section className="card overflow-hidden">
-      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-5 text-white">
-        <h3 className="text-base font-semibold">AI study plan</h3>
-        <p className="mt-1 text-sm text-indigo-100">Builds a 7-day plan around your classes and deadlines.</p>
+      <div className="border-b border-slate-200 p-5">
+        <h3 className="section-title">AI study plan</h3>
+        <p className="mt-1 text-sm text-slate-500">Builds a 7-day plan around your classes and deadlines.</p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input
             value={prefs}
             onChange={(e) => setPrefs(e.target.value)}
             placeholder="Preferences (optional), e.g. I study best in the evening, max 3 hours a day"
-            className="flex-1 rounded-xl border-0 bg-white/15 px-3 py-2 text-sm text-white placeholder:text-indigo-200 outline-none focus:bg-white/25"
+            className="input flex-1"
             aria-label="Study plan preferences"
           />
-          <button onClick={run} disabled={loading} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60">
+          <button onClick={run} disabled={loading} className="btn-primary">
             {loading ? "Planning…" : plan ? "Regenerate plan" : "Generate my study plan"}
           </button>
         </div>
@@ -174,7 +174,7 @@ function Assignments() {
             <StatusBadge status={dueStatus(a)} />
             {!a.done && !a.steps?.length && (
               <button onClick={() => breakDown(a)} disabled={breaking !== null} className="chip disabled:opacity-50" aria-label={`Break down ${a.title}`}>
-                {breaking === a.id ? "Thinking…" : "✨ Break down"}
+                {breaking === a.id ? "Thinking…" : "Break down"}
               </button>
             )}
             <button onClick={() => setAssignments((list) => list.filter((x) => x.id !== a.id))} className="text-xs text-slate-400 hover:text-red-600" aria-label={`Delete ${a.title}`}>

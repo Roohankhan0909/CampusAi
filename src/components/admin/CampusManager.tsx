@@ -45,7 +45,7 @@ export default function CampusManager({ entries }: { entries: StoredCampusEntry[
             <button
               key={c.id}
               onClick={() => setFilter(c.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${filter === c.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${filter === c.id ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
             >
               {c.label}
             </button>
@@ -136,7 +136,7 @@ function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone:
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-slate-400">Type a title, then let AI write the details.</span>
         <button type="button" onClick={draft} disabled={drafting || title.trim().length < 3} className="chip disabled:opacity-50">
-          {drafting ? "Writing…" : "✨ Write with AI"}
+          {drafting ? "Writing…" : "Write with AI"}
         </button>
       </div>
       {aiError && <p className="text-xs text-red-600">{aiError}</p>}

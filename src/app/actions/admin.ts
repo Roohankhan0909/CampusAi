@@ -63,6 +63,15 @@ export async function setUserRole(userId: string, role: Role) {
   revalidatePath("/admin");
 }
 
+export async function approveUser(userId: string) {
+  await requireAdmin();
+  await updateDb((db) => {
+    const user = db.users.find((u) => u.id === userId);
+    if (user) user.status = "active";
+  });
+  revalidatePath("/admin");
+}
+
 export async function deleteUser(userId: string) {
   const admin = await requireAdmin();
   if (userId === admin.id) return;

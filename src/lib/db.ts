@@ -3,11 +3,11 @@ import { promises as fs } from "fs";
 import path from "path";
 import { campusEntries } from "./campus-data";
 import { hashPassword } from "./password";
-import type { Profile, PublicUser, Role, StoredCampusEntry } from "./types";
+import type { Profile, PublicUser, Role, StoredCampusEntry, UserStatus } from "./types";
 
 // Simple JSON-file store for local use. Swap for a real database before deploying to serverless hosts.
 
-export type User = Omit<PublicUser, keyof Profile> & Partial<Profile> & { passwordHash: string };
+export type User = Omit<PublicUser, keyof Profile | "status"> & Partial<Profile> & { passwordHash: string; status?: UserStatus };
 
 export const AVATAR_COLORS = ["indigo", "violet", "emerald", "amber", "rose", "sky", "slate"];
 
@@ -77,12 +77,13 @@ export function updateDb<T>(fn: (db: Db) => T | Promise<T>): Promise<T> {
   });
 }
 
-export function toPublicUser({ id, name, email, role, createdAt, department, bio, courses, officeHours, avatarColor }: User): PublicUser {
+export function toPublicUser({ id, name, email, role, status, createdAt, department, bio, courses, officeHours, avatarColor }: User): PublicUser {
   return {
     id,
     name,
     email,
     role,
+    status: status ?? "active",
     createdAt,
     department: department ?? "",
     bio: bio ?? "",
@@ -92,6 +93,6 @@ export function toPublicUser({ id, name, email, role, createdAt, department, bio
   };
 }
 
-export function newUser(name: string, email: string, passwordHash: string, role: Role = "student", profile: Partial<Profile> = {}): User {
+export function newUser(name: string, email: string, passwordHash: string, role: Role = "student", profile: Partial<Profile> & { status?: UserStatus } = {}): User {
   return { id: crypto.randomUUID(), name, email, passwordHash, role, createdAt: new Date().toISOString(), ...profile };
 }

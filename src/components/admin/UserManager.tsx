@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { createUser, deleteUser, setUserRole, updateUserDetails } from "@/app/actions/admin";
+import { approveUser, createUser, deleteUser, setUserRole, updateUserDetails } from "@/app/actions/admin";
 import type { PublicUser, Role } from "@/lib/types";
 import Avatar from "../Avatar";
 import RoleBadge from "../RoleBadge";
@@ -30,7 +30,7 @@ export default function UserManager({ users, currentAdminId }: { users: PublicUs
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
-                className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${roleFilter === r ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${roleFilter === r ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
               >
                 {r === "all" ? "All" : `${r}s`} ({r === "all" ? users.length : users.filter((u) => u.role === r).length})
               </button>
@@ -70,6 +70,7 @@ export default function UserManager({ users, currentAdminId }: { users: PublicUs
                           <p className="font-medium">
                             {u.name}
                             {self && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                            {u.status === "pending" && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Awaiting approval</span>}
                           </p>
                           <p className="text-xs text-slate-500">
                             {u.email}
@@ -109,6 +110,11 @@ export default function UserManager({ users, currentAdminId }: { users: PublicUs
                     </td>
                     <td className="py-3 pr-4 text-slate-500">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="py-3 text-right whitespace-nowrap">
+                      {u.status === "pending" && (
+                        <button disabled={pending} onClick={() => startTransition(() => approveUser(u.id))} className="mr-3 text-xs font-semibold text-emerald-700 hover:underline">
+                          Approve
+                        </button>
+                      )}
                       <button onClick={() => setEditingId(u.id)} className="mr-3 text-xs font-medium text-indigo-600 hover:underline">
                         Edit
                       </button>

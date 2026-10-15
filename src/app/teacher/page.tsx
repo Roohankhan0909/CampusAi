@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TeacherPage() {
   const teacher = await requireRole("teacher");
-  const students = (await readDb()).users.map(toPublicUser).filter((u) => u.role === "student" && sharedCourses(u.courses, teacher.courses).length > 0);
+  const students = (await readDb()).users.map(toPublicUser).filter((u) => u.role === "student" && u.status === "active" && sharedCourses(u.courses, teacher.courses).length > 0);
   return (
     <div className="min-h-screen">
       <PortalHeader

@@ -28,9 +28,9 @@ export default function ProfileView({ user, connections, backHref }: { user: Pub
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         <aside className="card h-fit overflow-hidden">
-          <div className="h-20 bg-gradient-to-r from-indigo-600 to-violet-600" />
+          <div className="h-20 border-b border-indigo-200 bg-[radial-gradient(circle_at_30%_0%,#4a3c18,transparent_70%)]" />
           <div className="-mt-8 space-y-4 px-5 pb-5">
-            <div className="w-fit rounded-full ring-4 ring-white">
+            <div className="w-fit rounded-full ring-4 ring-[#131313]">
               <Avatar name={name || user.name} color={color} size="lg" />
             </div>
             <div>

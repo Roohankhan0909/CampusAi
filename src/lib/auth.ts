@@ -41,7 +41,7 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const actual = Buffer.from(sig);
   if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
   const user = (await readDb()).users.find((u) => u.id === userId);
-  return user ? toPublicUser(user) : null;
+  return user && user.status !== "pending" ? toPublicUser(user) : null;
 }
 
 export async function requireUser(): Promise<PublicUser> {

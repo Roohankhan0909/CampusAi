@@ -39,19 +39,20 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
 
   return (
     <div className="space-y-6">
-      <section className="card flex flex-col gap-4 bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+      <section className="card relative flex flex-col gap-4 overflow-hidden border-indigo-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-indigo-600" />
         <div>
-          <p className="text-sm text-indigo-100">{now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
-          <h2 className="mt-1 text-2xl font-bold">
+          <p className="text-xs font-medium tracking-[0.14em] text-indigo-500 uppercase">{now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h2 className="mt-1 text-3xl font-semibold">
             {greeting}
             {name ? `, ${name}` : ""}!
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => onNavigate("study")} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+          <button onClick={() => onNavigate("study")} className="btn-primary">
             Ask the study assistant
           </button>
-          <button onClick={() => onNavigate("planner")} className="rounded-xl bg-white/15 px-4 py-2 text-sm font-medium hover:bg-white/25">
+          <button onClick={() => onNavigate("planner")} className="btn-ghost">
             Plan my week with AI
           </button>
         </div>

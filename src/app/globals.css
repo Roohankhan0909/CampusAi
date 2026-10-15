@@ -1,28 +1,118 @@
 @import "tailwindcss";
 
+/* Black & gold theme: the palette is remapped so existing utility classes render dark. */
+@theme {
+  --color-white: #131313;
+  --color-slate-50: #191919;
+  --color-slate-100: #202020;
+  --color-slate-200: #2c2b29;
+  --color-slate-300: #3b3a37;
+  --color-slate-400: #77726a;
+  --color-slate-500: #9d978d;
+  --color-slate-600: #bab4a9;
+  --color-slate-700: #d5cfc4;
+  --color-slate-800: #e7e2d8;
+  --color-slate-900: #f4f0e7;
+  --color-slate-950: #faf8f2;
+
+  --color-indigo-50: #1d180c;
+  --color-indigo-100: #2a2211;
+  --color-indigo-200: #4a3c18;
+  --color-indigo-300: #76601f;
+  --color-indigo-400: #a9892f;
+  --color-indigo-500: #c6a23d;
+  --color-indigo-600: #d4af37;
+  --color-indigo-700: #e4c462;
+  --color-indigo-800: #edd58d;
+  --color-indigo-900: #f6e7ba;
+
+  --color-violet-50: #1d150c;
+  --color-violet-100: #2b1f12;
+  --color-violet-200: #4a3519;
+  --color-violet-600: #b8862b;
+  --color-violet-700: #d6a352;
+
+  --color-emerald-50: #0f1a14;
+  --color-emerald-100: #15271c;
+  --color-emerald-200: #1f3d2b;
+  --color-emerald-400: #3f9e6b;
+  --color-emerald-500: #4fb47c;
+  --color-emerald-600: #5ec48b;
+  --color-emerald-700: #82d6a6;
+  --color-emerald-800: #a6e4c1;
+
+  --color-red-50: #251313;
+  --color-red-100: #331818;
+  --color-red-200: #4d2020;
+  --color-red-400: #d86a6a;
+  --color-red-500: #e27979;
+  --color-red-600: #ec8c8c;
+  --color-red-700: #f3a6a6;
+
+  --color-amber-50: #221a0c;
+  --color-amber-100: #30240f;
+  --color-amber-200: #4d3a16;
+  --color-amber-400: #d9a441;
+  --color-amber-500: #e0b04f;
+  --color-amber-700: #edc877;
+  --color-amber-800: #f2d595;
+
+  --color-rose-100: #33181f;
+  --color-rose-700: #f0a3b4;
+  --color-sky-100: #12232e;
+  --color-sky-700: #9ccbe8;
+
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), Georgia, "Times New Roman", serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
 body {
-  background: #f5f6fb;
-  color: #0f172a;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #0a0a0a;
+  color: #f4f0e7;
+}
+
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--font-serif);
+    letter-spacing: 0.005em;
+  }
+  ::selection {
+    background: #d4af37;
+    color: #0a0a0a;
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-slate-200 bg-white;
   }
   .input {
-    @apply rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100;
+    @apply rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500;
   }
   .btn-primary {
-    @apply rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-ghost {
-    @apply rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100;
+    @apply rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-400 hover:text-indigo-700;
   }
   .chip {
     @apply rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100;
   }
   .section-title {
-    @apply text-sm font-semibold tracking-wide text-slate-500 uppercase;
+    @apply text-xs font-semibold tracking-[0.14em] text-indigo-500 uppercase;
+  }
+  .gold-rule {
+    @apply h-px bg-gradient-to-r from-transparent via-indigo-400 to-transparent;
   }
 }
