@@ -7,7 +7,11 @@ All-in-one student dashboard built with Next.js, TypeScript, and Tailwind.
 - **Campus Helper**: Q&A plus a browsable list of courses, events, facilities, and FAQs (`src/lib/campus-data.ts`).
 - **Planner**: weekly timetable, assignments with priorities, and deadline reminders (browser notifications).
 
-Data is stored in the browser's localStorage.
+- **Accounts**: login/sign-up pages, student and admin roles. Admins get an admin panel (`/admin`) with stats, user management, and a campus content editor.
+
+Accounts and campus content are stored in `data/db.json` (created on first run, gitignored). Planner data and chats are stored per user in the browser's localStorage.
+
+Default admin login: `admin@campusai.edu` / `admin12345` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before first run). The JSON file store won't persist on serverless hosts like Vercel; switch to a real database before deploying.
 
 ## Running locally
 
