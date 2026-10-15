@@ -1,6 +1,6 @@
 import type { CampusEntry } from "./types";
 
-// Sample campus knowledge base. Replace with your university's real data.
+// Sample data used to seed the campus knowledge base. Admins can edit it in the admin panel.
 export const CAMPUS_NAME = "CampusAI University";
 
 export const campusEntries: CampusEntry[] = [
@@ -24,8 +24,8 @@ export const campusEntries: CampusEntry[] = [
   { category: "faq", title: "How do I get my student ID card?", details: "Visit Student Services in the Admin Building with a photo ID. Replacement cards cost $15.", tags: ["id card", "student card", "lost card"] },
 ];
 
-export function campusContext(): string {
-  return campusEntries
+export function campusContext(entries: CampusEntry[]): string {
+  return entries
     .map((e) => `[${e.category}] ${e.title}${e.date ? ` (${e.date})` : ""}: ${e.details}`)
     .join("\n");
 }

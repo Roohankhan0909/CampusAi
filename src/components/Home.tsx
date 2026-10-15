@@ -1,16 +1,15 @@
 "use client";
 
-import { campusEntries } from "@/lib/campus-data";
 import { DAYS, KEYS, dueStatus, formatDateTime, relativeTime, seedAssignments, seedClasses, sortByDue, toLocalDate } from "@/lib/planner";
-import type { Assignment, ClassSession } from "@/lib/types";
+import type { Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import type { Tab } from "./Dashboard";
 import StatusBadge from "./StatusBadge";
 
-export default function Home({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
+export default function Home({ user, campus, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; onNavigate: (tab: Tab) => void }) {
   const [classes] = useLocalStorage<ClassSession[]>(KEYS.classes, seedClasses);
   const [assignments, setAssignments] = useLocalStorage<Assignment[]>(KEYS.assignments, seedAssignments);
-  const [name, setName] = useLocalStorage<string>(KEYS.name, "");
+  const name = user.name.split(" ")[0];
 
   const now = new Date();
   const hour = now.getHours();
@@ -23,7 +22,7 @@ export default function Home({ onNavigate }: { onNavigate: (tab: Tab) => void })
   const overdue = pending.filter((a) => dueStatus(a) === "overdue").length;
   const completion = assignments.length ? Math.round((assignments.filter((a) => a.done).length / assignments.length) * 100) : 0;
   const todayStr = toLocalDate(now);
-  const events = campusEntries
+  const events = campus
     .filter((e) => e.category === "event" && e.date && e.date >= todayStr)
     .sort((a, b) => a.date!.localeCompare(b.date!))
     .slice(0, 3);
@@ -46,15 +45,6 @@ export default function Home({ onNavigate }: { onNavigate: (tab: Tab) => void })
             {greeting}
             {name ? `, ${name}` : ""}!
           </h2>
-          {!name && (
-            <input
-              placeholder="What should I call you?"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setName(e.currentTarget.value.trim());
-              }}
-              className="mt-3 w-64 rounded-xl bg-white/15 px-3 py-2 text-sm text-white placeholder:text-indigo-100 outline-none focus:bg-white/25"
-            />
-          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => onNavigate("study")} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
@@ -136,7 +126,7 @@ export default function Home({ onNavigate }: { onNavigate: (tab: Tab) => void })
           ) : (
             <ul className="space-y-3">
               {events.map((e) => (
-                <li key={e.title} className="flex gap-3">
+                <li key={e.id} className="flex gap-3">
                   <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
                     <span className="text-[10px] font-semibold uppercase">{new Date(`${e.date}T00:00`).toLocaleDateString(undefined, { month: "short" })}</span>
                     <span className="text-sm font-bold leading-none">{e.date!.slice(8)}</span>

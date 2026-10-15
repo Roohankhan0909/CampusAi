@@ -47,3 +47,17 @@ export type AiResponse = {
   quiz?: QuizQuestion[];
   error?: string;
 };
+
+export type StoredCampusEntry = CampusEntry & { id: string };
+
+export type Role = "student" | "admin";
+
+export type PublicUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  createdAt: string;
+};
+
+export type FormState = { error?: string; success?: string } | undefined;

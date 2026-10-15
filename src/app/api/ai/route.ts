@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { readDb } from "@/lib/db";
 import { CAMPUS_NAME, campusContext } from "@/lib/campus-data";
 import { campusAnswer, makeQuiz, offlineStudyReply, summarize } from "@/lib/fallback";
-import type { AiResponse, AiTask, ChatMessage, QuizQuestion } from "@/lib/types";
+import type { AiResponse, AiTask, CampusEntry, ChatMessage, QuizQuestion } from "@/lib/types";
 
 type Body = {
   task?: AiTask;
@@ -52,7 +54,7 @@ function isQuiz(value: unknown): value is QuizQuestion[] {
 const STUDY_SYSTEM =
   "You are CampusAI, a friendly study assistant for university students. Explain concepts clearly with examples, keep answers concise, and use plain-text bullet points (•) instead of markdown.";
 
-async function runWithLlm(task: AiTask, input: string, messages: ChatMessage[], count: number): Promise<AiResponse> {
+async function runWithLlm(task: AiTask, input: string, messages: ChatMessage[], count: number, campus: CampusEntry[]): Promise<AiResponse> {
   switch (task) {
     case "chat":
       return { mode: "openai", text: await openai([{ role: "system", content: STUDY_SYSTEM }, ...messages]) };
@@ -62,7 +64,7 @@ async function runWithLlm(task: AiTask, input: string, messages: ChatMessage[], 
         text: await openai([
           {
             role: "system",
-            content: `You are the campus helper for ${CAMPUS_NAME}. Today is ${new Date().toDateString()}. Answer only using the campus information below; if the answer isn't there, say so and suggest who to contact. Use plain text, no markdown.\n\n${campusContext()}`,
+            content: `You are the campus helper for ${CAMPUS_NAME}. Today is ${new Date().toDateString()}. Answer only using the campus information below; if the answer isn't there, say so and suggest who to contact. Use plain text, no markdown.\n\n${campusContext(campus)}`,
           },
           ...messages,
         ]),
@@ -93,13 +95,13 @@ async function runWithLlm(task: AiTask, input: string, messages: ChatMessage[], 
   }
 }
 
-function runOffline(task: AiTask, input: string, messages: ChatMessage[], count: number): AiResponse {
+function runOffline(task: AiTask, input: string, messages: ChatMessage[], count: number, campus: CampusEntry[]): AiResponse {
   const last = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   switch (task) {
     case "chat":
       return { mode: "offline", text: offlineStudyReply(last) };
     case "campus":
-      return { mode: "offline", text: campusAnswer(last) };
+      return { mode: "offline", text: campusAnswer(last, campus) };
     case "summarize":
       return { mode: "offline", text: summarize(input) };
     case "quiz":
@@ -112,6 +114,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!(await getCurrentUser())) {
+    return NextResponse.json({ mode: "offline", error: "Please log in." } satisfies AiResponse, { status: 401 });
+  }
   let body: Body;
   try {
     body = await req.json();
@@ -138,12 +143,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ mode: "offline", error: "No message provided" } satisfies AiResponse, { status: 400 });
   }
 
+  const campus = task === "campus" ? (await readDb()).campus : [];
   if (hasKey()) {
     try {
-      return NextResponse.json(await runWithLlm(task, input, messages, count));
+      return NextResponse.json(await runWithLlm(task, input, messages, count, campus));
     } catch (err) {
       console.error("LLM call failed, using offline mode:", err);
     }
   }
-  return NextResponse.json(runOffline(task, input, messages, count));
+  return NextResponse.json(runOffline(task, input, messages, count, campus));
 }

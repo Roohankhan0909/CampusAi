@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AiMode, Assignment } from "@/lib/types";
+import { logout } from "@/app/actions/auth";
+import type { AiMode, Assignment, PublicUser, StoredCampusEntry } from "@/lib/types";
 import { KEYS, relativeTime } from "@/lib/planner";
+import { StorageScope } from "@/lib/useLocalStorage";
 import Icon, { type IconName } from "./Icon";
 import Home from "./Home";
 import StudyAssistant from "./StudyAssistant";
@@ -18,23 +21,23 @@ const NAV: { id: Tab; label: string; icon: IconName; subtitle: string }[] = [
   { id: "planner", label: "Planner", icon: "planner", subtitle: "Timetable, assignments, and deadlines" },
 ];
 
-function useDeadlineNotifications() {
+function useDeadlineNotifications(userId: string) {
   useEffect(() => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    if (localStorage.getItem(KEYS.reminders) !== "true" || sessionStorage.getItem("campusai.notified")) return;
-    const assignments: Assignment[] = JSON.parse(localStorage.getItem(KEYS.assignments) ?? "[]");
+    if (localStorage.getItem(`${KEYS.reminders}.${userId}`) !== "true" || sessionStorage.getItem("campusai.notified")) return;
+    const assignments: Assignment[] = JSON.parse(localStorage.getItem(`${KEYS.assignments}.${userId}`) ?? "[]");
     const now = Date.now();
     assignments
       .filter((a) => !a.done && new Date(a.due).getTime() - now < 24 * 3600 * 1000 && new Date(a.due).getTime() > now)
       .forEach((a) => new Notification(`Due ${relativeTime(a.due)}: ${a.title}`, { body: a.course }));
     sessionStorage.setItem("campusai.notified", "1");
-  }, []);
+  }, [userId]);
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user, campus }: { user: PublicUser; campus: StoredCampusEntry[] }) {
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<AiMode | null>(null);
-  useDeadlineNotifications();
+  useDeadlineNotifications(user.id);
 
   useEffect(() => {
     fetch("/api/ai")
@@ -46,6 +49,7 @@ export default function Dashboard() {
   const current = NAV.find((n) => n.id === tab)!;
 
   return (
+    <StorageScope.Provider value={user.id}>
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0">
         <div className="flex items-center gap-2 px-5 py-5">
@@ -68,9 +72,26 @@ export default function Dashboard() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto hidden p-4 md:block">
+        <div className="mt-auto space-y-3 p-4">
+          {user.role === "admin" && (
+            <Link href="/admin" className="flex items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              Admin panel
+            </Link>
+          )}
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+              {user.name.slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{user.name}</p>
+              <p className="truncate text-xs text-slate-500">{user.email}</p>
+            </div>
+            <form action={logout}>
+              <button className="text-xs font-medium text-slate-500 hover:text-red-600">Log out</button>
+            </form>
+          </div>
           {mode && (
-            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+            <div className="hidden rounded-xl bg-slate-50 p-3 text-xs text-slate-600 md:block">
               <div className="flex items-center gap-2 font-semibold">
                 <span className={`h-2 w-2 rounded-full ${mode === "openai" ? "bg-emerald-500" : "bg-amber-500"}`} />
                 {mode === "openai" ? "AI: connected" : "AI: offline mode"}
@@ -86,11 +107,12 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">{current.label}</h1>
           <p className="text-sm text-slate-500">{current.subtitle}</p>
         </header>
-        {tab === "home" && <Home onNavigate={setTab} />}
+        {tab === "home" && <Home user={user} campus={campus} onNavigate={setTab} />}
         {tab === "study" && <StudyAssistant />}
-        {tab === "campus" && <CampusHelper />}
+        {tab === "campus" && <CampusHelper campus={campus} />}
         {tab === "planner" && <Planner />}
       </main>
     </div>
+    </StorageScope.Provider>
   );
 }

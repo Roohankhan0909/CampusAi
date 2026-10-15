@@ -1,4 +1,3 @@
-import { campusEntries } from "./campus-data";
 import type { CampusEntry, QuizQuestion } from "./types";
 
 // Lightweight offline "AI" used when no LLM API key is configured.
@@ -97,7 +96,7 @@ export function makeQuiz(text: string, count: number): QuizQuestion[] {
   return quiz;
 }
 
-export function searchCampus(query: string, entries: CampusEntry[] = campusEntries): CampusEntry[] {
+export function searchCampus(query: string, entries: CampusEntry[]): CampusEntry[] {
   const q = tokenize(query).filter((w) => !STOP.has(w)).map(stem);
   if (q.length === 0) return [];
   const scored = entries.map((e) => {
@@ -127,8 +126,8 @@ const LABELS: Record<CampusEntry["category"], string> = {
   faq: "FAQ",
 };
 
-export function campusAnswer(question: string): string {
-  const results = searchCampus(question);
+export function campusAnswer(question: string, entries: CampusEntry[]): string {
+  const results = searchCampus(question, entries);
   if (results.length === 0) {
     return "I couldn't find that in the campus info. Try asking about courses, exams, the library, dining, health services, IT help, or upcoming events.";
   }

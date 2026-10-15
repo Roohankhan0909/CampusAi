@@ -7,7 +7,6 @@ export const KEYS = {
   campusChat: "campusai.campusChat",
   notes: "campusai.notes",
   reminders: "campusai.reminders",
-  name: "campusai.name",
 };
 
 export const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

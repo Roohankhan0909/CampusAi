@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { callAi } from "@/lib/api";
-import { CAMPUS_NAME, campusEntries } from "@/lib/campus-data";
+import { CAMPUS_NAME } from "@/lib/campus-data";
 import { KEYS } from "@/lib/planner";
-import type { CampusCategory, ChatMessage } from "@/lib/types";
+import type { CampusCategory, ChatMessage, StoredCampusEntry } from "@/lib/types";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import Chat from "./Chat";
 
@@ -16,7 +16,7 @@ const FILTERS: { id: CampusCategory | "all"; label: string }[] = [
   { id: "faq", label: "FAQ" },
 ];
 
-export default function CampusHelper() {
+export default function CampusHelper({ campus }: { campus: StoredCampusEntry[] }) {
   const [messages, setMessages] = useLocalStorage<ChatMessage[]>(KEYS.campusChat, []);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<CampusCategory | "all">("all");
@@ -37,7 +37,7 @@ export default function CampusHelper() {
   };
 
   const q = query.toLowerCase();
-  const entries = campusEntries
+  const entries = campus
     .filter((e) => filter === "all" || e.category === filter)
     .filter((e) => !q || `${e.title} ${e.details} ${e.tags.join(" ")}`.toLowerCase().includes(q));
 
@@ -68,7 +68,7 @@ export default function CampusHelper() {
         </div>
         <ul className="flex-1 space-y-3 overflow-y-auto pr-1">
           {entries.map((e) => (
-            <li key={e.title} className="rounded-xl border border-slate-200 p-3">
+            <li key={e.id} className="rounded-xl border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">{e.title}</p>
                 <span className="shrink-0 text-[11px] font-medium text-slate-400 uppercase">{e.date ?? e.category}</span>

@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
+// Scopes stored data to the logged-in user so accounts sharing a browser don't mix data.
+export const StorageScope = createContext("anon");
+
+export function useScopedKey(key: string) {
+  return `${key}.${useContext(StorageScope)}`;
+}
 
 // Client-only: components using this must not be server-rendered.
-export function useLocalStorage<T>(key: string, initial: T | (() => T)) {
+export function useLocalStorage<T>(baseKey: string, initial: T | (() => T)) {
+  const key = useScopedKey(baseKey);
   const [value, setValue] = useState<T>(() => {
     try {
       const raw = window.localStorage.getItem(key);
