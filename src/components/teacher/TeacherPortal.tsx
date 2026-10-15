@@ -6,7 +6,7 @@ import { sharedCourses } from "@/lib/courses";
 import type { PublicUser } from "@/lib/types";
 import Avatar from "../Avatar";
 
-export default function TeacherPortal({ teacher, students }: { teacher: PublicUser; students: PublicUser[] }) {
+export default function TeacherPortal({ teacher, students, workload }: { teacher: PublicUser; students: PublicUser[]; workload: Record<string, { posts: number; toGrade: number }> }) {
   const [course, setCourse] = useState<string | "all">("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -66,16 +66,18 @@ export default function TeacherPortal({ teacher, students }: { teacher: PublicUs
         <>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {teacher.courses.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCourse(course === c ? "all" : c)}
-                className={`card p-4 text-left transition ${course === c ? "border-indigo-400 bg-indigo-50" : "hover:border-indigo-200"}`}
-              >
-                <p className="text-sm font-semibold">{c}</p>
-                <p className="text-xs text-slate-500">
-                  {counts[c]} student{counts[c] === 1 ? "" : "s"}
-                </p>
-              </button>
+              <div key={c} className={`card flex flex-col gap-3 p-4 transition ${course === c ? "border-indigo-400 bg-indigo-50" : ""}`}>
+                <button onClick={() => setCourse(course === c ? "all" : c)} className="text-left" title="Filter students by this course">
+                  <p className="text-lg font-semibold">{c}</p>
+                  <p className="text-xs text-slate-500">
+                    {counts[c]} student{counts[c] === 1 ? "" : "s"} · {workload[c]?.posts ?? 0} posted
+                    {!!workload[c]?.toGrade && <span className="text-indigo-700"> · {workload[c].toGrade} to grade</span>}
+                  </p>
+                </button>
+                <Link href={`/teacher/course/${encodeURIComponent(c)}`} className="btn-primary text-center text-xs">
+                  Materials, assignments &amp; quizzes
+                </Link>
+              </div>
             ))}
           </section>
 

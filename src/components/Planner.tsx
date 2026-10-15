@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useContext, useState } from "react";
 import { DAYS, KEYS, WEEK_ORDER, dueStatus, formatDateTime, newId, relativeTime, seedAssignments, seedClasses, sortByDue } from "@/lib/planner";
 import { callAi } from "@/lib/api";
 import type { Assignment, ClassSession, Priority } from "@/lib/types";
-import { usePlannerSnapshot } from "@/lib/usePlannerSnapshot";
+import { CourseDeadlines, usePlannerSnapshot } from "@/lib/usePlannerSnapshot";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import StatusBadge from "./StatusBadge";
 
@@ -14,6 +14,7 @@ export default function Planner() {
   return (
     <div className="space-y-6">
       <AiPlan />
+      <CourseWork />
       <Assignments />
       <Timetable />
     </div>
@@ -70,6 +71,31 @@ function AiPlan() {
           <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{plan.text}</div>
         </div>
       )}
+    </section>
+  );
+}
+
+function CourseWork() {
+  const deadlines = useContext(CourseDeadlines);
+  if (deadlines.length === 0) return null;
+  return (
+    <section className="card p-5">
+      <h3 className="section-title mb-1">From your teachers</h3>
+      <p className="mb-3 text-xs text-slate-500">Open assignments and quizzes posted in your courses. Submit them from the My courses tab.</p>
+      <ul className="divide-y divide-slate-100">
+        {deadlines.map((d) => (
+          <li key={d.id} className="flex items-center gap-3 py-2.5">
+            <span className="w-20 shrink-0 text-[11px] font-semibold tracking-wide text-indigo-600 uppercase">{d.kind}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{d.title}</p>
+              <p className="text-xs text-slate-500">
+                {d.course} · {formatDateTime(d.due)} ({relativeTime(d.due)})
+              </p>
+            </div>
+            <StatusBadge status={dueStatus({ due: d.due, done: false } as Assignment)} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

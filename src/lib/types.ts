@@ -82,3 +82,52 @@ export type Profile = {
 };
 
 export type FormState = { error?: string; success?: string } | undefined;
+
+export type FileRef = { id: string; name: string; size: number; type: string };
+
+type CourseItemBase = { id: string; course: string; title: string; authorId: string; authorName: string; createdAt: string };
+
+export type CourseMaterial = CourseItemBase & { description: string; file?: FileRef; url?: string };
+
+export type CourseAssignment = CourseItemBase & { instructions: string; due: string; points: number; file?: FileRef };
+
+export type Submission = {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  note: string;
+  file?: FileRef;
+  submittedAt: string;
+  grade?: string;
+  feedback?: string;
+};
+
+export type CourseQuiz = CourseItemBase & { description: string; due?: string; questions: QuizQuestion[] };
+
+export type QuizAttempt = {
+  id: string;
+  quizId: string;
+  studentId: string;
+  studentName: string;
+  answers: number[];
+  score: number;
+  total: number;
+  submittedAt: string;
+};
+
+export type StudentAssignment = CourseAssignment & { submission?: Submission };
+
+export type StudentQuiz = Omit<CourseQuiz, "questions"> & {
+  questions: { question: string; options: string[] }[];
+  attempt?: QuizAttempt;
+  review?: QuizQuestion[];
+};
+
+export type StudentCourseWork = { materials: CourseMaterial[]; assignments: StudentAssignment[]; quizzes: StudentQuiz[] };
+
+export type TeacherCourseWork = {
+  materials: CourseMaterial[];
+  assignments: (CourseAssignment & { submissions: Submission[] })[];
+  quizzes: (CourseQuiz & { attempts: QuizAttempt[] })[];
+};
