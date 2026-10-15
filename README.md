@@ -7,7 +7,10 @@ All-in-one student dashboard built with Next.js, TypeScript, and Tailwind.
 - **Campus Helper**: Q&A plus a browsable list of courses, events, facilities, and FAQs (`src/lib/campus-data.ts`).
 - **Planner**: weekly timetable, assignments with priorities, and deadline reminders (browser notifications).
 
-- **Accounts**: login/sign-up pages, student and admin roles. Admins get an admin panel (`/admin`) with stats, user management, and a campus content editor.
+- **Accounts**: one login page for students, teachers, and admins, each sent to their own portal. Sign-up offers "I'm a student" or "I'm a teacher". Teacher accounts stay pending until an admin approves them.
+- **Teacher portal** (`/teacher`): courses, and students matched by shared course codes, with their profiles.
+- **Admin panel** (`/admin`): stats, teacher approvals, user management (create users, set roles, edit details), and a campus content editor.
+- **Profiles** (`/profile`): department, bio, courses, office hours, and password change.
 
 Accounts and campus content are stored in `data/db.json` (created on first run, gitignored). Planner data and chats are stored per user in the browser's localStorage.
 
