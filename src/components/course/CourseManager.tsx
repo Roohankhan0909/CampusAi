@@ -8,6 +8,7 @@ import { ACCEPT, MAX_UPLOAD_MB } from "@/lib/coursework";
 import { formatDateTime, relativeTime } from "@/lib/planner";
 import type { CourseAssignment, CourseMaterial, CourseQuiz, PublicUser, QuizAttempt, QuizQuestion, Submission, TeacherCourseWork } from "@/lib/types";
 import FileLink from "./FileLink";
+import { useUploadForm } from "./useUploadForm";
 
 type Tab = "materials" | "assignments" | "quizzes";
 
@@ -90,9 +91,10 @@ const FileHint = () => <p className="mt-1 text-xs text-slate-400">PDF, Word, Pow
 
 function Materials({ course, items }: { course: string; items: CourseMaterial[] }) {
   const [state, action, pending] = useActionState(addMaterial, undefined);
+  const upload = useUploadForm(action, state, { course });
   return (
     <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
-      <form action={action} className="card h-fit space-y-3 p-5">
+      <form ref={upload.formRef} onSubmit={upload.onSubmit} className="card h-fit space-y-3 p-5">
         <h2 className="text-xl font-semibold">Share a material</h2>
         <input type="hidden" name="course" value={course} />
         <input name="title" placeholder="Title, e.g. Week 3 lecture slides" className="input w-full" aria-label="Material title" required maxLength={150} />
@@ -103,9 +105,9 @@ function Materials({ course, items }: { course: string; items: CourseMaterial[] 
           <FileHint />
         </div>
         <input name="url" type="url" placeholder="…or a link (YouTube, Google Drive, website)" className="input w-full" aria-label="Material link" />
-        <Notice state={state} />
-        <button className="btn-primary w-full" disabled={pending}>
-          {pending ? "Uploading…" : "Post material"}
+        <Notice state={upload.error ? { error: upload.error } : state} />
+        <button className="btn-primary w-full" disabled={pending || upload.uploading}>
+          {upload.uploading ? "Uploading…" : pending ? "Posting…" : "Post material"}
         </button>
       </form>
 
@@ -136,10 +138,11 @@ function Materials({ course, items }: { course: string; items: CourseMaterial[] 
 
 function Assignments({ course, items, students }: { course: string; items: (CourseAssignment & { submissions: Submission[] })[]; students: PublicUser[] }) {
   const [state, action, pending] = useActionState(addAssignment, undefined);
+  const upload = useUploadForm(action, state, { course });
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
-      <form action={action} className="card h-fit space-y-3 p-5">
+      <form ref={upload.formRef} onSubmit={upload.onSubmit} className="card h-fit space-y-3 p-5">
         <h2 className="text-xl font-semibold">New assignment</h2>
         <input type="hidden" name="course" value={course} />
         <input name="title" placeholder="Title, e.g. Lab 5: Recursion" className="input w-full" aria-label="Assignment title" required maxLength={150} />
@@ -159,9 +162,9 @@ function Assignments({ course, items, students }: { course: string; items: (Cour
           <input type="file" name="file" accept={ACCEPT} className="block w-full text-sm text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:text-slate-800" aria-label="Assignment file" />
           <FileHint />
         </div>
-        <Notice state={state} />
-        <button className="btn-primary w-full" disabled={pending}>
-          {pending ? "Posting…" : "Post assignment"}
+        <Notice state={upload.error ? { error: upload.error } : state} />
+        <button className="btn-primary w-full" disabled={pending || upload.uploading}>
+          {upload.uploading ? "Uploading…" : pending ? "Posting…" : "Post assignment"}
         </button>
       </form>
 

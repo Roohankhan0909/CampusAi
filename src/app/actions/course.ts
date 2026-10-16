@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { canManageCourse, isEnrolled, normalizeCourse } from "@/lib/course";
 import { readDb, updateDb } from "@/lib/db";
-import { checkUpload, deleteUploads, saveUpload, uploadedFile } from "@/lib/files";
+import { claimUpload, createUpload, deleteUploads, type UploadTicket } from "@/lib/files";
 import type { FileRef, FormState, PublicUser, QuizAttempt, QuizQuestion } from "@/lib/types";
 
 const field = (formData: FormData, name: string, max = 500) => String(formData.get(name) ?? "").trim().slice(0, max);
@@ -24,11 +24,20 @@ async function courseManager(rawCourse: string): Promise<{ user: PublicUser; cou
   return course && canManageCourse(user, course) ? { user, course } : null;
 }
 
-async function storeOptionalFile(formData: FormData): Promise<{ file?: FileRef; error?: string }> {
-  const file = uploadedFile(formData);
-  if (!file) return {};
-  const error = checkUpload(file);
-  return error ? { error } : { file: await saveUpload(file) };
+async function storeOptionalFile(formData: FormData, userId: string): Promise<{ file?: FileRef; error?: string }> {
+  const ref = field(formData, "fileRef", 4000);
+  return ref ? claimUpload(ref, userId) : {};
+}
+
+export async function prepareUpload(input: { name: string; size: number; course?: string; assignmentId?: string }): Promise<{ ticket?: UploadTicket; error?: string }> {
+  const user = await requireUser();
+  if (input?.assignmentId) {
+    const assignment = (await readDb()).assignments.find((a) => a.id === input.assignmentId);
+    if (!assignment || !isEnrolled(user, assignment.course)) return { error: "You aren't enrolled in this course." };
+  } else if (!canManageCourse(user, normalizeCourse(clip(input?.course, 20)))) {
+    return { error: "You can only post to courses you teach." };
+  }
+  return createUpload(user.id, clip(input.name, 200), Number(input.size));
 }
 
 const authored = (user: PublicUser, course: string, title: string) => ({
@@ -48,8 +57,8 @@ export async function addMaterial(_: FormState, formData: FormData): Promise<For
   const url = field(formData, "url", 500);
   if (!title) return { error: "Please add a title." };
   if (url && !/^https?:\/\/\S+$/i.test(url)) return { error: "Links must start with http:// or https://" };
-  if (!uploadedFile(formData) && !url) return { error: "Attach a file or add a link." };
-  const { file, error } = await storeOptionalFile(formData);
+  if (!formData.get("fileRef") && !url) return { error: "Attach a file or add a link." };
+  const { file, error } = await storeOptionalFile(formData, ctx.user.id);
   if (error) return { error };
 
   await updateDb((db) => {
@@ -82,7 +91,7 @@ export async function addAssignment(_: FormState, formData: FormData): Promise<F
   if (!title) return { error: "Please add a title." };
   if (!DUE_RE.test(due)) return { error: "Please choose a due date and time." };
   if (!Number.isFinite(points) || points < 0 || points > 1000) return { error: "Points must be between 0 and 1000." };
-  const { file, error } = await storeOptionalFile(formData);
+  const { file, error } = await storeOptionalFile(formData, ctx.user.id);
   if (error) return { error };
 
   await updateDb((db) => {
@@ -111,11 +120,11 @@ export async function submitAssignment(_: FormState, formData: FormData): Promis
   const user = await requireUser();
   const assignmentId = field(formData, "assignmentId", 40);
   const note = field(formData, "note", 3000);
-  if (!note && !uploadedFile(formData)) return { error: "Attach a file or write a note to submit." };
+  if (!note && !formData.get("fileRef")) return { error: "Attach a file or write a note to submit." };
 
   const assignment = (await readDb()).assignments.find((a) => a.id === assignmentId);
   if (!assignment || !isEnrolled(user, assignment.course)) return { error: "You aren't enrolled in this course." };
-  const { file, error } = await storeOptionalFile(formData);
+  const { file, error } = await storeOptionalFile(formData, user.id);
   if (error) return { error };
 
   const replaced = await updateDb((db) => {

@@ -29,6 +29,8 @@ const FILE_TYPES: Record<string, string> = {
   zip: "application/zip",
 };
 
+export const MIME_TYPES = [...new Set(Object.values(FILE_TYPES))];
+
 export const ACCEPT = Object.keys(FILE_TYPES)
   .map((ext) => `.${ext}`)
   .join(",");
