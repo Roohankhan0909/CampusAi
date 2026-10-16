@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { parseCourses } from "@/lib/courses";
 import { newUser, updateDb } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { deleteUserData } from "@/lib/userData";
 import type { CampusCategory, FormState, Role } from "@/lib/types";
 
 const CATEGORIES: CampusCategory[] = ["course", "event", "facility", "faq"];
@@ -78,6 +79,7 @@ export async function deleteUser(userId: string) {
   await updateDb((db) => {
     db.users = db.users.filter((u) => u.id !== userId);
   });
+  await deleteUserData(userId);
   revalidatePath("/admin");
 }
 

@@ -7,7 +7,7 @@ import type { PublicUser, Role } from "./types";
 const COOKIE = "campusai_session";
 const MAX_AGE = 7 * 24 * 3600;
 
-async function getSecret(): Promise<string> {
+export async function getSecret(): Promise<string> {
   return process.env.AUTH_SECRET || (await readDb()).secret;
 }
 

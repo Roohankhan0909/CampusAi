@@ -13,9 +13,15 @@ All-in-one student dashboard built with Next.js, TypeScript, and Tailwind.
 - **Admin panel** (`/admin`): stats, teacher approvals, user management (create users, set roles, edit details), and a campus content editor.
 - **Profiles** (`/profile`): department, bio, courses, office hours, and password change.
 
-Accounts, campus content, and course content are stored in `data/db.json` (created on first run, gitignored); uploaded files go in `data/uploads/` (max 10 MB each, served only to the course's teachers and enrolled students). Planner data and chats are stored per user in the browser's localStorage.
+**Storage.** With `SUPABASE_DB_URL` set, accounts, campus content, course content and each user's planner/chats/flashcards are stored in Supabase Postgres (tables are created on first request, with row-level security on and no policies, so the public REST API can't read them). With `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, uploads (max 10 MB) go straight from the browser to a private Supabase Storage bucket through signed upload URLs, and downloads go through `/api/files/[id]`, which checks that the user teaches or is enrolled in the course. Without these variables, everything falls back to local files (`data/db.json`, `data/user-data.json`, `data/uploads/`), which is fine for development but won't persist on serverless hosts. Planner data is cached in localStorage and synced to the account, so it follows the user across devices.
 
-Default admin login: `admin@campusai.edu` / `admin12345` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before first run). The JSON file store won't persist on serverless hosts like Vercel; switch to a real database before deploying.
+Default admin login: `admin@campusai.edu` / `admin12345` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before first run).
+
+## Deploying to Vercel
+
+1. Create a Supabase project and import this repo in Vercel.
+2. Set environment variables: `SUPABASE_DB_URL` (pooler connection string), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_SECRET` (long random string), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and optionally `AI_API_KEY`.
+3. Deploy. The first request creates the tables, the storage bucket and the admin account.
 
 ## Running locally
 

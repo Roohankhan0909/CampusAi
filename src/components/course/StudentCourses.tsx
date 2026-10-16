@@ -8,6 +8,7 @@ import { dueStatus, formatDateTime, relativeTime } from "@/lib/planner";
 import type { Assignment, PublicUser, QuizAttempt, QuizQuestion, StudentAssignment, StudentCourseWork, StudentQuiz } from "@/lib/types";
 import StatusBadge from "../StatusBadge";
 import FileLink from "./FileLink";
+import { useUploadForm } from "./useUploadForm";
 
 const statusFor = (due: string, done: boolean) => dueStatus({ due, done } as Assignment);
 
@@ -93,6 +94,8 @@ export default function StudentCourses({ user, work }: { user: PublicUser; work:
 function AssignmentCard({ assignment: a }: { assignment: StudentAssignment }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(submitAssignment, undefined);
+  const upload = useUploadForm(action, state, { assignmentId: a.id });
+  const error = upload.error ?? state?.error;
   const s = a.submission;
   return (
     <article className="card p-4">
@@ -140,16 +143,16 @@ function AssignmentCard({ assignment: a }: { assignment: StudentAssignment }) {
             {s ? "Resubmit" : "Submit work"}
           </button>
         ) : (
-          <form action={action} className="space-y-2 rounded-xl border border-slate-200 p-3">
+          <form ref={upload.formRef} onSubmit={upload.onSubmit} className="space-y-2 rounded-xl border border-slate-200 p-3">
             <input type="hidden" name="assignmentId" value={a.id} />
             <textarea name="note" rows={3} placeholder="Add a note for your teacher (optional if you attach a file)" className="input w-full" aria-label={`Note for ${a.title}`} />
             <input type="file" name="file" accept={ACCEPT} className="block w-full text-sm text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:text-slate-800" aria-label={`File for ${a.title}`} />
             <p className="text-xs text-slate-400">Up to {MAX_UPLOAD_MB} MB. Resubmitting replaces your previous submission.</p>
-            {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-            {state?.success && <p className="text-sm text-emerald-700">{state.success}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {!error && state?.success && <p className="text-sm text-emerald-700">{state.success}</p>}
             <div className="flex gap-2">
-              <button className="btn-primary" disabled={pending}>
-                {pending ? "Submitting…" : "Submit"}
+              <button className="btn-primary" disabled={pending || upload.uploading}>
+                {upload.uploading ? "Uploading…" : pending ? "Submitting…" : "Submit"}
               </button>
               <button type="button" onClick={() => setOpen(false)} className="btn-ghost">
                 Close
