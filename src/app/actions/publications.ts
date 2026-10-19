@@ -59,7 +59,7 @@ export async function reviewPublication(id: string, decision: "approved" | "reje
   if (decision !== "approved" && decision !== "rejected") return { error: "Invalid decision." };
   const ok = await updateDb((db) => {
     const p = db.publications.find((x) => x.id === id);
-    if (!p || p.authorId === user.id || !canReview(user, p)) return false;
+    if (!p || p.status !== "pending" || (p.authorId === user.id && user.role !== "admin") || !canReview(user, p)) return false;
     Object.assign(p, { status: decision, note: String(note ?? "").trim().slice(0, 1000) || undefined, reviewedAt: new Date().toISOString(), reviewedBy: user.name });
     return true;
   });

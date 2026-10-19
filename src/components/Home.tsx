@@ -2,7 +2,7 @@
 
 import { DAYS, KEYS, dueStatus, formatDateTime, relativeTime, seedAssignments, seedClasses, sortByDue, toLocalDate } from "@/lib/planner";
 import type { Announcement, Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
-import { StreakContext } from "@/lib/activity";
+import { StreakContext, markStudied } from "@/lib/activity";
 import { useContext } from "react";
 import { CourseDeadlines } from "@/lib/usePlannerSnapshot";
 import { useLocalStorage } from "@/lib/useLocalStorage";
@@ -36,7 +36,10 @@ export default function Home({ user, campus, teachers, announcements, onNavigate
     .sort((a, b) => a.date!.localeCompare(b.date!))
     .slice(0, 3);
 
-  const toggle = (id: string) => setAssignments((list) => list.map((a) => (a.id === id ? { ...a, done: !a.done } : a)));
+  const toggle = (id: string) => {
+    if (assignments.some((a) => a.id === id && !a.done)) markStudied();
+    setAssignments((list) => list.map((a) => (a.id === id ? { ...a, done: !a.done } : a)));
+  };
 
   const stats = [
     { label: "Classes today", value: todaysClasses.length },

@@ -29,8 +29,13 @@ export function summarize(dates: string[], today: string): StreakSummary {
   return { current, since: current ? isoDate(t + DAY) : undefined, best, total: set.size, first: sorted[0] };
 }
 
-export function streaksFor(activity: ActivityDay[], userId: string, today = todayIso()): Streaks {
+// Without an explicit day (teacher views), use the student's own latest day when it is one day ahead of
+// the server's UTC date, so students east of UTC aren't shown a broken streak after their local midnight.
+export function streaksFor(activity: ActivityDay[], userId: string, day?: string): Streaks {
   const mine = activity.filter((a) => a.userId === userId).sort((a, b) => a.date.localeCompare(b.date));
+  const server = todayIso();
+  const latest = mine.at(-1)?.date;
+  const today = day ?? (latest && latest > server && toTime(latest) - toTime(server) <= DAY ? latest : server);
   return {
     open: summarize(mine.filter((d) => d.opened).map((d) => d.date), today),
     study: summarize(mine.filter((d) => d.studied).map((d) => d.date), today),

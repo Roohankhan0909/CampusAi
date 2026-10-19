@@ -44,6 +44,8 @@ export async function prepareUpload(input: { name: string; size: number; course?
   return createUpload(user.id, clip(input.name, 200), Number(input.size));
 }
 
+const MAX_PLAN_TASKS = 40;
+
 const authored = (user: PublicUser, course: string, title: string) => ({
   id: crypto.randomUUID(),
   course,
@@ -254,8 +256,9 @@ export async function addStudyPlan(input: { course: string; title: string; descr
   if (!ctx) return { error: "You can only post to courses you teach." };
   const title = clip(input.title, 150);
   if (!title) return { error: "Give the plan a title." };
-  const tasks: PlanTask[] = (Array.isArray(input.tasks) ? input.tasks : [])
-    .slice(0, 40)
+  const raw = Array.isArray(input.tasks) ? input.tasks : [];
+  if (raw.filter((t) => clip(t?.text, 200)).length > MAX_PLAN_TASKS) return { error: `A plan can have at most ${MAX_PLAN_TASKS} tasks.` };
+  const tasks: PlanTask[] = raw
     .map((t) => ({ id: crypto.randomUUID(), text: clip(t?.text, 200), due: /^\d{4}-\d{2}-\d{2}$/.test(clip(t?.due, 10)) ? clip(t.due, 10) : undefined }))
     .filter((t) => t.text);
   if (!tasks.length) return { error: "Add at least one task." };

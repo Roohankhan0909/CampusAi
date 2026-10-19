@@ -22,7 +22,7 @@ export function publicationsView(db: Db, user: PublicUser): PublicationsView {
   return {
     library: newest.filter((p) => p.status === "approved"),
     mine: newest.filter((p) => p.authorId === user.id),
-    toReview: newest.filter((p) => p.status === "pending" && p.authorId !== user.id && canReview(user, p)),
+    toReview: newest.filter((p) => p.status === "pending" && (p.authorId !== user.id || user.role === "admin") && canReview(user, p)),
     reviewers: reviewersFor(db, user),
   };
 }

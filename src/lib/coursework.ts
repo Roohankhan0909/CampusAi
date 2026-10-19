@@ -26,6 +26,7 @@ const FILE_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   gif: "image/gif",
+  webp: "image/webp",
   zip: "application/zip",
 };
 

@@ -540,8 +540,8 @@ function Plans({ course, items, students }: { course: string; items: StudyPlan[]
               <input type="date" value={t.due} onChange={(e) => setTask(t.key, { due: e.target.value })} className="input w-36" aria-label={`Task ${i + 1} date`} />
             </div>
           ))}
-          <button type="button" onClick={() => setTasks((l) => [...l, emptyTask()])} className="chip">
-            + Add task
+          <button type="button" onClick={() => setTasks((l) => [...l, emptyTask()])} disabled={tasks.length >= 40} className="chip disabled:opacity-50">
+            {tasks.length >= 40 ? "40 tasks max" : "+ Add task"}
           </button>
         </div>
         {state && <Notice state={state} />}
