@@ -7,7 +7,7 @@ import type { FormState } from "@/lib/types";
 
 // Uploads the form's "file" input straight to storage, then submits the rest of the form with a signed "fileRef".
 // The form is only cleared after a successful save, so a rejected file doesn't wipe what the user typed.
-export function useUploadForm(dispatch: (fd: FormData) => void, state: FormState, scope: { course: string } | { assignmentId: string }) {
+export function useUploadForm(dispatch: (fd: FormData) => void, state: FormState, scope: { course: string } | { assignmentId: string } | { purpose: "campus" | "publication" }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();

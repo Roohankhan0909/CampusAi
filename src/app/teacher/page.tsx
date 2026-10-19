@@ -4,6 +4,8 @@ import TeacherPortal from "@/components/teacher/TeacherPortal";
 import { requireRole } from "@/lib/auth";
 import { sharedCourses } from "@/lib/courses";
 import { readDb, toPublicUser } from "@/lib/db";
+import { publicationsView } from "@/lib/publications";
+import { streaksFor } from "@/lib/streaks";
 
 export const metadata: Metadata = { title: "Teacher portal — CampusAI" };
 export const dynamic = "force-dynamic";
@@ -19,6 +21,12 @@ export default async function TeacherPage() {
     }),
   );
   const students = db.users.map(toPublicUser).filter((u) => u.role === "student" && u.status === "active" && sharedCourses(u.courses, teacher.courses).length > 0);
+  const streaks = Object.fromEntries(
+    students.map((s) => {
+      const { open, study } = streaksFor(db.activity, s.id);
+      return [s.id, { open, study }];
+    }),
+  );
   return (
     <div className="min-h-screen">
       <PortalHeader
@@ -29,7 +37,7 @@ export default async function TeacherPage() {
           { href: "/", label: "AI dashboard" },
         ]}
       />
-      <TeacherPortal teacher={teacher} students={students} workload={workload} />
+      <TeacherPortal teacher={teacher} students={students} workload={workload} streaks={streaks} publications={publicationsView(db, teacher)} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { parseCourses } from "./courses";
 import type { Db } from "./db";
+import { canViewPublication } from "./publications";
 import type { FileRef, PublicUser, StudentCourseWork, TeacherCourseWork } from "./types";
 
 export const normalizeCourse = (code: string) => parseCourses(code)[0] ?? "";
@@ -31,6 +32,11 @@ export function studentCourseWork(db: Db, user: PublicUser): StudentCourseWork {
         // Correct answers are only sent after the student has submitted.
         return { ...quiz, questions: questions.map(({ question, options }) => ({ question, options })), ...(attempt ? { attempt, review: questions } : {}) };
       }),
+    announcements: db.announcements.filter((a) => mine(a.course)).sort(newestFirst),
+    plans: db.plans
+      .filter((p) => mine(p.course) && (!p.studentId || p.studentId === user.id))
+      .sort(newestFirst)
+      .map(({ done, ...plan }) => ({ ...plan, completed: done[user.id] ?? [] })),
   };
 }
 
@@ -45,6 +51,8 @@ export function teacherCourseWork(db: Db, course: string): TeacherCourseWork {
       .filter((q) => q.course === course)
       .sort(newestFirst)
       .map((q) => ({ ...q, attempts: db.quizAttempts.filter((t) => t.quizId === q.id) })),
+    announcements: db.announcements.filter((a) => a.course === course).sort(newestFirst),
+    plans: db.plans.filter((p) => p.course === course).sort(newestFirst),
   };
 }
 
@@ -53,6 +61,10 @@ export function findAccessibleFile(db: Db, user: PublicUser, fileId: string): Fi
   for (const item of [...db.materials, ...db.assignments]) {
     if (item.file?.id === fileId) return canView(item.course) ? item.file : null;
   }
+  const image = db.campus.find((e) => e.image?.id === fileId)?.image;
+  if (image) return image;
+  const publication = db.publications.find((p) => p.file.id === fileId);
+  if (publication) return canViewPublication(user, publication) ? publication.file : null;
   const submission = db.submissions.find((s) => s.file?.id === fileId);
   if (!submission) return null;
   const assignment = db.assignments.find((a) => a.id === submission.assignmentId);

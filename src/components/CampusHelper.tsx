@@ -69,6 +69,10 @@ export default function CampusHelper({ campus }: { campus: StoredCampusEntry[] }
         <ul className="flex-1 space-y-3 overflow-y-auto pr-1">
           {entries.map((e) => (
             <li key={e.id} className="rounded-xl border border-slate-200 p-3">
+              {e.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/files/${e.image.id}`} alt={e.title} loading="lazy" className="mb-2 h-36 w-full rounded-lg object-cover" />
+              )}
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">{e.title}</p>
                 <span className="shrink-0 text-[11px] font-medium text-slate-400 uppercase">{e.date ?? e.category}</span>

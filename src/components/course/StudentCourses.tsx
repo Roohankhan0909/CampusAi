@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
-import { submitAssignment, submitQuiz } from "@/app/actions/course";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { markStudied } from "@/lib/activity";
+import { submitAssignment, submitQuiz, togglePlanTask } from "@/app/actions/course";
 import { ACCEPT, MAX_UPLOAD_MB } from "@/lib/coursework";
 import { dueStatus, formatDateTime, relativeTime } from "@/lib/planner";
-import type { Assignment, PublicUser, QuizAttempt, QuizQuestion, StudentAssignment, StudentCourseWork, StudentQuiz } from "@/lib/types";
+import type { Assignment, PublicUser, QuizAttempt, QuizQuestion, StudentAssignment, StudentCourseWork, StudentQuiz, StudentPlan } from "@/lib/types";
 import StatusBadge from "../StatusBadge";
 import FileLink from "./FileLink";
 import { useUploadForm } from "./useUploadForm";
@@ -30,6 +31,8 @@ export default function StudentCourses({ user, work }: { user: PublicUser; work:
   const assignments = inCourse(work.assignments);
   const quizzes = inCourse(work.quizzes);
   const materials = inCourse(work.materials);
+  const announcements = inCourse(work.announcements);
+  const plans = inCourse(work.plans);
 
   return (
     <div className="space-y-6">
@@ -44,6 +47,32 @@ export default function StudentCourses({ user, work }: { user: PublicUser; work:
           </button>
         ))}
       </div>
+
+      {announcements.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold">Announcements</h2>
+          {announcements.map((a) => (
+            <article key={a.id} className="card border-l-2 border-l-indigo-600 p-4">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">{a.course}</span>
+                <h3 className="font-semibold">{a.title}</h3>
+              </div>
+              <p className="mt-2 text-sm whitespace-pre-wrap text-slate-600">{a.body}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {a.authorName} · {new Date(a.createdAt).toLocaleDateString()}
+              </p>
+            </article>
+          ))}
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="text-2xl font-semibold">Study plans</h2>
+        {plans.length === 0 && <p className="card p-5 text-sm text-slate-400">Your teachers haven&apos;t shared a study plan yet.</p>}
+        {plans.map((p) => (
+          <PlanCard key={p.id} plan={p} />
+        ))}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-2xl font-semibold">Assignments</h2>
@@ -97,6 +126,9 @@ function AssignmentCard({ assignment: a }: { assignment: StudentAssignment }) {
   const upload = useUploadForm(action, state, { assignmentId: a.id });
   const error = upload.error ?? state?.error;
   const s = a.submission;
+  useEffect(() => {
+    if (state?.success) markStudied();
+  }, [state]);
   return (
     <article className="card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -184,6 +216,7 @@ function QuizCard({ quiz }: { quiz: StudentQuiz }) {
       );
       if (res.error || !res.attempt || !res.review) return setError(res.error ?? "Couldn't submit the quiz.");
       setResult({ attempt: res.attempt, review: res.review });
+      markStudied();
       setTaking(false);
       setShowReview(true);
     });
@@ -273,6 +306,55 @@ function QuizCard({ quiz }: { quiz: StudentQuiz }) {
           </div>
         </div>
       )}
+    </article>
+  );
+}
+
+function PlanCard({ plan }: { plan: StudentPlan }) {
+  const [done, setDone] = useState(new Set(plan.completed));
+  const [error, setError] = useState<string>();
+  const [, start] = useTransition();
+  const toggle = (id: string) => {
+    const next = !done.has(id);
+    setDone((d) => {
+      const n = new Set(d);
+      if (next) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+    if (next) markStudied();
+    start(async () => setError((await togglePlanTask(plan.id, id, next)).error));
+  };
+  const pct = Math.round((done.size / plan.tasks.length) * 100);
+  return (
+    <article className="card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">{plan.course}</span>
+          <h3 className="font-semibold">{plan.title}</h3>
+          {plan.studentId && <span className="text-[11px] font-medium text-slate-500 uppercase">Just for you</span>}
+        </div>
+        <span className="text-xs text-slate-500">
+          {done.size}/{plan.tasks.length} done · {pct}%
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full bg-indigo-600" style={{ width: `${pct}%` }} />
+      </div>
+      {plan.description && <p className="mt-2 text-sm whitespace-pre-wrap text-slate-600">{plan.description}</p>}
+      <ul className="mt-3 space-y-1.5">
+        {plan.tasks.map((t) => (
+          <li key={t.id}>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={done.has(t.id)} onChange={() => toggle(t.id)} aria-label={t.text} />
+              <span className={done.has(t.id) ? "text-slate-400 line-through" : ""}>{t.text}</span>
+              {t.due && <span className="ml-auto text-xs text-slate-400">{new Date(`${t.due}T00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>}
+            </label>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <p className="mt-2 text-xs text-slate-400">From {plan.authorName}</p>
     </article>
   );
 }

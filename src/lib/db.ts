@@ -4,7 +4,7 @@ import path from "path";
 import postgres from "postgres";
 import { campusEntries } from "./campus-data";
 import { hashPassword } from "./password";
-import type { CourseAssignment, CourseMaterial, CourseQuiz, Profile, PublicUser, QuizAttempt, Role, StoredCampusEntry, Submission, UserStatus } from "./types";
+import type { ActivityDay, Announcement, CourseAssignment, CourseMaterial, CourseQuiz, Profile, Publication, PublicUser, QuizAttempt, Role, StoredCampusEntry, StudyPlan, Submission, UserStatus } from "./types";
 
 // With SUPABASE_DB_URL (or DATABASE_URL) set, data lives in Postgres (e.g. Supabase); otherwise in a local JSON file for development.
 
@@ -21,6 +21,10 @@ export type Db = {
   submissions: Submission[];
   quizzes: CourseQuiz[];
   quizAttempts: QuizAttempt[];
+  announcements: Announcement[];
+  plans: StudyPlan[];
+  publications: Publication[];
+  activity: ActivityDay[];
 };
 
 type Collection = Exclude<keyof Db, "secret">;
@@ -34,6 +38,10 @@ const TABLES: Record<Collection, string> = {
   submissions: "assignment_submissions",
   quizzes: "course_quizzes",
   quizAttempts: "quiz_attempts",
+  announcements: "course_announcements",
+  plans: "study_plans",
+  publications: "publications",
+  activity: "activity_days",
 };
 const COLLECTIONS = Object.keys(TABLES) as Collection[];
 
@@ -58,6 +66,10 @@ async function seed(): Promise<Db> {
     submissions: [],
     quizzes: [],
     quizAttempts: [],
+    announcements: [],
+    plans: [],
+    publications: [],
+    activity: [],
   };
 }
 

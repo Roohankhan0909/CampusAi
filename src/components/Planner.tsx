@@ -1,5 +1,6 @@
 "use client";
 
+import { markStudied } from "@/lib/activity";
 import { FormEvent, useContext, useState } from "react";
 import { DAYS, KEYS, WEEK_ORDER, dueStatus, formatDateTime, newId, relativeTime, seedAssignments, seedClasses, sortByDue } from "@/lib/planner";
 import { callAi } from "@/lib/api";
@@ -185,7 +186,10 @@ function Assignments() {
             <input
               type="checkbox"
               checked={a.done}
-              onChange={() => update(a.id, (x) => ({ ...x, done: !x.done }))}
+              onChange={() => {
+                if (!a.done) markStudied();
+                update(a.id, (x) => ({ ...x, done: !x.done }));
+              }}
               className="h-4 w-4 accent-indigo-600"
               aria-label={`Mark ${a.title} done`}
             />

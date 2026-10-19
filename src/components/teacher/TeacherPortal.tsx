@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { sharedCourses } from "@/lib/courses";
-import type { PublicUser } from "@/lib/types";
+import type { PublicationsView, PublicUser, Streaks } from "@/lib/types";
+import Publications from "../progress/Publications";
+import { StreakBadge } from "../progress/StreakView";
 import Avatar from "../Avatar";
 
-export default function TeacherPortal({ teacher, students, workload }: { teacher: PublicUser; students: PublicUser[]; workload: Record<string, { posts: number; toGrade: number }> }) {
+export default function TeacherPortal({ teacher, students, workload, streaks, publications }: { teacher: PublicUser; students: PublicUser[]; workload: Record<string, { posts: number; toGrade: number }>; streaks: Record<string, Pick<Streaks, "open" | "study">>; publications: PublicationsView }) {
   const [course, setCourse] = useState<string | "all">("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export default function TeacherPortal({ teacher, students, workload }: { teacher
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{s.name}</p>
                         <p className="truncate text-xs text-slate-500">{s.email}</p>
+                        <StreakBadge streaks={streaks[s.id]} />
                       </div>
                       <div className="hidden flex-wrap justify-end gap-1 sm:flex">
                         {sharedCourses(s.courses, teacher.courses).map((c) => (
@@ -123,6 +126,20 @@ export default function TeacherPortal({ teacher, students, workload }: { teacher
                       {selected.department && <p className="text-sm text-slate-500">{selected.department}</p>}
                     </div>
                   </div>
+                  {streaks[selected.id] && (
+                    <dl className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
+                      <div>
+                        <dt className="text-slate-500">Study streak</dt>
+                        <dd className="text-lg font-semibold text-indigo-600">{streaks[selected.id].study.current} days</dd>
+                        <dd className="text-slate-500">Best {streaks[selected.id].study.best} · {streaks[selected.id].study.total} days total</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Open streak</dt>
+                        <dd className="text-lg font-semibold">{streaks[selected.id].open.current} days</dd>
+                        <dd className="text-slate-500">{streaks[selected.id].open.first ? `Active since ${new Date(`${streaks[selected.id].open.first}T00:00`).toLocaleDateString()}` : "Not active yet"}</dd>
+                      </div>
+                    </dl>
+                  )}
                   {selected.bio && <p className="text-sm whitespace-pre-wrap text-slate-600">{selected.bio}</p>}
                   <div>
                     <p className="mb-1 text-xs font-semibold text-slate-500 uppercase">Courses</p>
@@ -146,6 +163,10 @@ export default function TeacherPortal({ teacher, students, workload }: { teacher
           </div>
         </>
       )}
+      <section className="space-y-3">
+        <h2 className="text-2xl font-semibold">Articles &amp; research papers</h2>
+        <Publications view={publications} />
+      </section>
     </main>
   );
 }

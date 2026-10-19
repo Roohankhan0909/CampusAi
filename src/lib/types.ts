@@ -40,6 +40,7 @@ export type CampusEntry = {
   details: string;
   tags: string[];
   date?: string;
+  image?: FileRef;
 };
 
 export type AiMode = "ai" | "offline";
@@ -124,10 +125,52 @@ export type StudentQuiz = Omit<CourseQuiz, "questions"> & {
   review?: QuizQuestion[];
 };
 
-export type StudentCourseWork = { materials: CourseMaterial[]; assignments: StudentAssignment[]; quizzes: StudentQuiz[] };
+export type StudentCourseWork = { materials: CourseMaterial[]; assignments: StudentAssignment[]; quizzes: StudentQuiz[]; announcements: Announcement[]; plans: StudentPlan[] };
 
 export type TeacherCourseWork = {
   materials: CourseMaterial[];
   assignments: (CourseAssignment & { submissions: Submission[] })[];
   quizzes: (CourseQuiz & { attempts: QuizAttempt[] })[];
+  announcements: Announcement[];
+  plans: StudyPlan[];
 };
+
+export type Announcement = CourseItemBase & { body: string };
+
+export type PlanTask = { id: string; text: string; due?: string };
+
+// done maps studentId -> completed task ids. studentId set means the plan targets one student; otherwise the whole course.
+export type StudyPlan = CourseItemBase & { description: string; studentId?: string; studentName?: string; tasks: PlanTask[]; done: Record<string, string[]> };
+
+export type StudentPlan = Omit<StudyPlan, "done"> & { completed: string[] };
+
+export type ActivityDay = { id: string; userId: string; date: string; opened: boolean; studied: boolean };
+
+export type StreakSummary = { current: number; since?: string; best: number; total: number; first?: string };
+
+export type Streaks = { open: StreakSummary; study: StreakSummary; days: { date: string; opened: boolean; studied: boolean }[] };
+
+export type PublicationKind = "article" | "paper";
+
+export type PublicationStatus = "pending" | "approved" | "rejected";
+
+// reviewerId is a teacher's id, or "admin" for the admin office.
+export type Publication = {
+  id: string;
+  kind: PublicationKind;
+  title: string;
+  abstract: string;
+  authorId: string;
+  authorName: string;
+  authorRole: Role;
+  reviewerId: string;
+  reviewerName: string;
+  file: FileRef;
+  status: PublicationStatus;
+  note?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+};
+
+export type PublicationsView = { library: Publication[]; mine: Publication[]; toReview: Publication[]; reviewers: { id: string; name: string }[] };

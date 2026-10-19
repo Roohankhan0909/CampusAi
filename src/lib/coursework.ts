@@ -48,10 +48,13 @@ export function formatSize(bytes: number): string {
 
 export const fileUrl = (file: FileRef) => `/api/files/${file.id}`;
 
-export type CourseDeadline = { id: string; title: string; course: string; due: string; kind: "assignment" | "quiz" };
+export type CourseDeadline = { id: string; title: string; course: string; due: string; kind: "assignment" | "quiz" | "plan" };
 
 export function openCourseDeadlines(work: StudentCourseWork): CourseDeadline[] {
   const assignments = work.assignments.filter((a) => !a.submission).map((a): CourseDeadline => ({ id: a.id, title: a.title, course: a.course, due: a.due, kind: "assignment" }));
   const quizzes = work.quizzes.filter((q) => q.due && !q.attempt).map((q): CourseDeadline => ({ id: q.id, title: q.title, course: q.course, due: q.due!, kind: "quiz" }));
-  return [...assignments, ...quizzes].sort((a, b) => a.due.localeCompare(b.due));
+  const planTasks = work.plans.flatMap((p) =>
+    p.tasks.filter((t) => t.due && !p.completed.includes(t.id)).map((t): CourseDeadline => ({ id: `${p.id}:${t.id}`, title: `${t.text} (${p.title})`, course: p.course, due: `${t.due}T23:59`, kind: "plan" })),
+  );
+  return [...assignments, ...quizzes, ...planTasks].sort((a, b) => a.due.localeCompare(b.due));
 }

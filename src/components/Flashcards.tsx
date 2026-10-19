@@ -1,5 +1,6 @@
 "use client";
 
+import { markStudied } from "@/lib/activity";
 import { useState } from "react";
 import { callAi } from "@/lib/api";
 import { KEYS } from "@/lib/planner";
@@ -38,6 +39,7 @@ export default function Flashcards({ notesInput, notes }: { notesInput: React.Re
     setFlipped(false);
   };
   const mark = (known: boolean) => {
+    markStudied();
     setDeck((d) => ({ ...d, known: known ? [...new Set([...d.known, index])] : d.known.filter((k) => k !== index) }));
     go(index + 1);
   };
