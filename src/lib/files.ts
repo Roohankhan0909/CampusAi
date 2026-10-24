@@ -32,9 +32,14 @@ function bucket() {
 function ensureBucket(): Promise<void> {
   bucketReady ??= (async () => {
     const storage = supabase!.storage;
-    if (!(await storage.getBucket(BUCKET)).error) return;
-    const { error } = await storage.createBucket(BUCKET, { public: false, fileSizeLimit: MAX_UPLOAD_BYTES, allowedMimeTypes: MIME_TYPES });
-    if (error && !/exist/i.test(error.message)) throw error;
+    const options = { public: false, fileSizeLimit: MAX_UPLOAD_BYTES, allowedMimeTypes: MIME_TYPES };
+    const { data: existing } = await storage.getBucket(BUCKET);
+    const current = existing?.allowed_mime_types ?? [];
+    if (existing && MIME_TYPES.every((t) => current.includes(t))) return;
+    const { error } = existing
+      ? await storage.updateBucket(BUCKET, options)
+      : await storage.createBucket(BUCKET, options);
+    if (error && !(!existing && /exist/i.test(error.message))) throw error;
   })().catch((e) => {
     bucketReady = undefined;
     throw e;

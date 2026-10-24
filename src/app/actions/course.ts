@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { canManageCourse, isEnrolled, normalizeCourse } from "@/lib/course";
 import { readDb, updateDb } from "@/lib/db";
 import { claimUpload, createUpload, deleteUploads, type UploadTicket } from "@/lib/files";
-import type { FileRef, FormState, PublicUser, QuizAttempt, QuizQuestion } from "@/lib/types";
+import type { FileRef, FormState, PlanTask, PublicUser, QuizAttempt, QuizQuestion } from "@/lib/types";
 
 const field = (formData: FormData, name: string, max = 500) => String(formData.get(name) ?? "").trim().slice(0, max);
 const clip = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
@@ -29,9 +29,13 @@ async function storeOptionalFile(formData: FormData, userId: string): Promise<{ 
   return ref ? claimUpload(ref, userId) : {};
 }
 
-export async function prepareUpload(input: { name: string; size: number; course?: string; assignmentId?: string }): Promise<{ ticket?: UploadTicket; error?: string }> {
+export async function prepareUpload(input: { name: string; size: number; course?: string; assignmentId?: string; purpose?: "campus" | "publication" }): Promise<{ ticket?: UploadTicket; error?: string }> {
   const user = await requireUser();
-  if (input?.assignmentId) {
+  if (input?.purpose === "campus") {
+    if (user.role !== "admin") return { error: "Only admins can add campus pictures." };
+  } else if (input?.purpose === "publication") {
+    // any signed-in user may submit a publication
+  } else if (input?.assignmentId) {
     const assignment = (await readDb()).assignments.find((a) => a.id === input.assignmentId);
     if (!assignment || !isEnrolled(user, assignment.course)) return { error: "You aren't enrolled in this course." };
   } else if (!canManageCourse(user, normalizeCourse(clip(input?.course, 20)))) {
@@ -39,6 +43,8 @@ export async function prepareUpload(input: { name: string; size: number; course?
   }
   return createUpload(user.id, clip(input.name, 200), Number(input.size));
 }
+
+const MAX_PLAN_TASKS = 40;
 
 const authored = (user: PublicUser, course: string, title: string) => ({
   id: crypto.randomUUID(),
@@ -221,4 +227,73 @@ export async function submitQuiz(quizId: string, answers: number[]): Promise<{ e
   });
   if ("course" in result && result.course) refresh(result.course);
   return { error: result.error, attempt: result.attempt, review: result.review };
+}
+
+export async function addAnnouncement(_: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await courseManager(field(formData, "course", 20));
+  if (!ctx) return { error: "You can only post to courses you teach." };
+  const title = field(formData, "title", 150);
+  const body = field(formData, "body", 3000);
+  if (!title || !body) return { error: "Add a title and a message." };
+  await updateDb((db) => {
+    db.announcements.push({ ...authored(ctx.user, ctx.course, title), body });
+  });
+  refresh(ctx.course);
+  return { success: "Announcement posted." };
+}
+
+export async function deleteAnnouncement(id: string) {
+  const item = (await readDb()).announcements.find((a) => a.id === id);
+  if (!item || !(await courseManager(item.course))) return;
+  await updateDb((db) => {
+    db.announcements = db.announcements.filter((a) => a.id !== id);
+  });
+  refresh(item.course);
+}
+
+export async function addStudyPlan(input: { course: string; title: string; description: string; studentId: string; tasks: { text: string; due: string }[] }): Promise<FormState> {
+  const ctx = await courseManager(clip(input?.course, 20));
+  if (!ctx) return { error: "You can only post to courses you teach." };
+  const title = clip(input.title, 150);
+  if (!title) return { error: "Give the plan a title." };
+  const raw = Array.isArray(input.tasks) ? input.tasks : [];
+  if (raw.filter((t) => clip(t?.text, 200)).length > MAX_PLAN_TASKS) return { error: `A plan can have at most ${MAX_PLAN_TASKS} tasks.` };
+  const tasks: PlanTask[] = raw
+    .map((t) => ({ id: crypto.randomUUID(), text: clip(t?.text, 200), due: /^\d{4}-\d{2}-\d{2}$/.test(clip(t?.due, 10)) ? clip(t.due, 10) : undefined }))
+    .filter((t) => t.text);
+  if (!tasks.length) return { error: "Add at least one task." };
+  const db = await readDb();
+  const studentId = clip(input.studentId, 60);
+  const student = studentId ? db.users.find((u) => u.id === studentId && u.role === "student" && (u.courses ?? []).includes(ctx.course)) : undefined;
+  if (studentId && !student) return { error: "That student isn't enrolled in this course." };
+  await updateDb((db) => {
+    db.plans.push({ ...authored(ctx.user, ctx.course, title), description: clip(input.description, 2000), ...(student ? { studentId: student.id, studentName: student.name } : {}), tasks, done: {} });
+  });
+  refresh(ctx.course);
+  return { success: student ? `Plan sent to ${student.name}.` : "Plan posted to the course." };
+}
+
+export async function deleteStudyPlan(id: string) {
+  const item = (await readDb()).plans.find((p) => p.id === id);
+  if (!item || !(await courseManager(item.course))) return;
+  await updateDb((db) => {
+    db.plans = db.plans.filter((p) => p.id !== id);
+  });
+  refresh(item.course);
+}
+
+export async function togglePlanTask(planId: string, taskId: string, done: boolean): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const ok = await updateDb((db) => {
+    const plan = db.plans.find((p) => p.id === planId);
+    if (!plan || !isEnrolled(user, plan.course) || (plan.studentId && plan.studentId !== user.id) || !plan.tasks.some((t) => t.id === taskId)) return false;
+    const current = new Set(plan.done[user.id] ?? []);
+    if (done) current.add(taskId);
+    else current.delete(taskId);
+    plan.done = { ...plan.done, [user.id]: [...current] };
+    return true;
+  });
+  if (!ok) return { error: "You can't update this plan." };
+  refresh((await readDb()).plans.find((p) => p.id === planId)!.course);
+  return {};
 }

@@ -7,7 +7,8 @@ import { parseCourses } from "@/lib/courses";
 import { newUser, updateDb } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { deleteUserData } from "@/lib/userData";
-import type { CampusCategory, FormState, Role } from "@/lib/types";
+import { claimUpload, deleteUploads } from "@/lib/files";
+import type { CampusCategory, FormState, Role, FileRef } from "@/lib/types";
 
 const CATEGORIES: CampusCategory[] = ["course", "event", "facility", "faq"];
 const ROLES: Role[] = ["student", "teacher", "admin"];
@@ -99,18 +100,37 @@ export async function saveCampusEntry(_: FormState, formData: FormData): Promise
   if (!title || !details) return { error: "Title and details are required." };
   if (category === "event" && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Events need a date." };
 
+  const admin = await requireAdmin();
+  const ref = String(formData.get("fileRef") ?? "");
+  let image: FileRef | undefined;
+  if (ref) {
+    const claimed = await claimUpload(ref, admin.id);
+    if (!claimed.file) return { error: claimed.error ?? "Upload failed." };
+    if (!claimed.file.type.startsWith("image/")) {
+      await deleteUploads([claimed.file]);
+      return { error: "The picture must be an image file (JPG, PNG, WebP or GIF)." };
+    }
+    image = claimed.file;
+  }
+  const removeImage = formData.get("removeImage") === "on";
   const entry = { category, title, details, tags, ...(category === "event" ? { date } : {}) };
-  const ok = await updateDb((db) => {
+  const result = await updateDb((db): { ok: boolean; old?: FileRef } => {
     if (!id) {
-      db.campus.push({ id: crypto.randomUUID(), ...entry });
-      return true;
+      db.campus.push({ id: crypto.randomUUID(), ...entry, ...(image ? { image } : {}) });
+      return { ok: true };
     }
     const idx = db.campus.findIndex((e) => e.id === id);
-    if (idx === -1) return false;
-    db.campus[idx] = { id, ...entry };
-    return true;
+    if (idx === -1) return { ok: false };
+    const prev = db.campus[idx].image;
+    const keep = image ?? (removeImage ? undefined : prev);
+    db.campus[idx] = { id, ...entry, ...(keep ? { image: keep } : {}) };
+    return { ok: true, old: prev && prev.id !== keep?.id ? prev : undefined };
   });
-  if (!ok) return { error: "Entry not found." };
+  if (!result.ok) {
+    if (image) await deleteUploads([image]);
+    return { error: "Entry not found." };
+  }
+  if (result.old) await deleteUploads([result.old]);
 
   revalidatePath("/admin");
   revalidatePath("/");
@@ -119,9 +139,12 @@ export async function saveCampusEntry(_: FormState, formData: FormData): Promise
 
 export async function deleteCampusEntry(id: string) {
   await requireAdmin();
-  await updateDb((db) => {
+  const image = await updateDb((db) => {
+    const img = db.campus.find((e) => e.id === id)?.image;
     db.campus = db.campus.filter((e) => e.id !== id);
+    return img;
   });
+  if (image) await deleteUploads([image]);
   revalidatePath("/admin");
   revalidatePath("/");
 }

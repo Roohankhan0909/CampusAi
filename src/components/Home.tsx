@@ -1,7 +1,8 @@
 "use client";
 
 import { DAYS, KEYS, dueStatus, formatDateTime, relativeTime, seedAssignments, seedClasses, sortByDue, toLocalDate } from "@/lib/planner";
-import type { Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
+import type { Announcement, Assignment, ClassSession, PublicUser, StoredCampusEntry } from "@/lib/types";
+import { StreakContext, markStudied } from "@/lib/activity";
 import { useContext } from "react";
 import { CourseDeadlines } from "@/lib/usePlannerSnapshot";
 import { useLocalStorage } from "@/lib/useLocalStorage";
@@ -9,10 +10,11 @@ import type { Tab } from "./Dashboard";
 import Avatar from "./Avatar";
 import StatusBadge from "./StatusBadge";
 
-export default function Home({ user, campus, teachers, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; onNavigate: (tab: Tab) => void }) {
+export default function Home({ user, campus, teachers, announcements, onNavigate }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; announcements: Announcement[]; onNavigate: (tab: Tab) => void }) {
   const [classes] = useLocalStorage<ClassSession[]>(KEYS.classes, seedClasses);
   const [assignments, setAssignments] = useLocalStorage<Assignment[]>(KEYS.assignments, seedAssignments);
   const courseDeadlines = useContext(CourseDeadlines);
+  const streaks = useContext(StreakContext);
   const name = user.name.split(" ")[0];
 
   const now = new Date();
@@ -22,7 +24,7 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
   const todaysClasses = classes.filter((c) => c.day === today).sort((a, b) => a.start.localeCompare(b.start));
   const pending = sortByDue(assignments.filter((a) => !a.done));
   const weekAhead = now.getTime() + 7 * 86400000;
-  const fromCourses = courseDeadlines.map((d): Assignment => ({ id: d.id, title: d.kind === "quiz" ? `Quiz: ${d.title}` : d.title, course: d.course, due: d.due, priority: "high", done: false }));
+  const fromCourses = courseDeadlines.map((d): Assignment => ({ id: d.id, title: d.kind === "quiz" ? `Quiz: ${d.title}` : d.kind === "plan" ? `Plan: ${d.title}` : d.title, course: d.course, due: d.due, priority: "high", done: false }));
   const courseIds = new Set(fromCourses.map((a) => a.id));
   const upcoming = sortByDue([...pending, ...fromCourses]);
   const dueThisWeek = upcoming.filter((a) => new Date(a.due).getTime() <= weekAhead).length;
@@ -34,7 +36,10 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
     .sort((a, b) => a.date!.localeCompare(b.date!))
     .slice(0, 3);
 
-  const toggle = (id: string) => setAssignments((list) => list.map((a) => (a.id === id ? { ...a, done: !a.done } : a)));
+  const toggle = (id: string) => {
+    if (assignments.some((a) => a.id === id && !a.done)) markStudied();
+    setAssignments((list) => list.map((a) => (a.id === id ? { ...a, done: !a.done } : a)));
+  };
 
   const stats = [
     { label: "Classes today", value: todaysClasses.length },
@@ -148,7 +153,65 @@ export default function Home({ user, campus, teachers, onNavigate }: { user: Pub
                   <div>
                     <p className="text-sm font-medium">{e.title}</p>
                     <p className="line-clamp-2 text-xs text-slate-500">{e.details}</p>
+                    {e.image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`/api/files/${e.image.id}`} alt={e.title} loading="lazy" className="mt-2 h-24 w-full rounded-lg object-cover" />
+                    )}
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
+        <section className="card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="section-title">Streaks</h3>
+            <button onClick={() => onNavigate("progress")} className="text-xs font-medium text-indigo-600 hover:underline">
+              My progress
+            </button>
+          </div>
+          {streaks ? (
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-3xl font-semibold text-indigo-600">{streaks.study.current}</p>
+                <p className="text-xs text-slate-500">day study streak</p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-3xl font-semibold">{streaks.open.current}</p>
+                <p className="text-xs text-slate-500">day open streak</p>
+              </div>
+              <p className="col-span-2 text-xs text-slate-500">
+                Best study streak {streaks.study.best} · studied on {streaks.study.total} day{streaks.study.total === 1 ? "" : "s"}
+                {streaks.open.first ? ` since ${new Date(`${streaks.open.first}T00:00`).toLocaleDateString()}` : ""}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Loading…</p>
+          )}
+        </section>
+        <section className="card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="section-title">Announcements</h3>
+            {announcements.length > 0 && (
+              <button onClick={() => onNavigate("courses")} className="text-xs font-medium text-indigo-600 hover:underline">
+                My courses
+              </button>
+            )}
+          </div>
+          {announcements.length === 0 ? (
+            <p className="text-sm text-slate-500">No announcements from your teachers.</p>
+          ) : (
+            <ul className="space-y-3">
+              {announcements.slice(0, 3).map((a) => (
+                <li key={a.id} className="text-sm">
+                  <p className="font-medium">
+                    <span className="mr-2 text-[11px] font-semibold text-indigo-600">{a.course}</span>
+                    {a.title}
+                  </p>
+                  <p className="line-clamp-2 text-xs text-slate-500">{a.body}</p>
                 </li>
               ))}
             </ul>

@@ -1,3 +1,4 @@
+import { markStudied } from "./activity";
 import type { AiResponse, AiTask, ChatMessage, PlannerData } from "./types";
 
 type AiRequest = {
@@ -17,5 +18,6 @@ export async function callAi(body: AiRequest): Promise<AiResponse> {
   });
   const data = (await res.json()) as AiResponse;
   if (!res.ok) throw new Error(data.error ?? "Request failed");
+  if (!["campus", "campusDraft"].includes(body.task as string)) markStudied();
   return data;
 }

@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { logout } from "@/app/actions/auth";
 import { openCourseDeadlines } from "@/lib/coursework";
-import type { AiMode, Assignment, PublicUser, StoredCampusEntry, StudentCourseWork } from "@/lib/types";
+import type { AiMode, Assignment, PublicationsView, PublicUser, StoredCampusEntry, Streaks, StudentCourseWork } from "@/lib/types";
+import { recordActivity } from "@/app/actions/activity";
+import { STUDY_EVENT, StreakContext, localDay } from "@/lib/activity";
+import StreakView from "./progress/StreakView";
+import Publications from "./progress/Publications";
 import { KEYS, relativeTime } from "@/lib/planner";
 import { CourseDeadlines } from "@/lib/usePlannerSnapshot";
 import { StorageScope } from "@/lib/useLocalStorage";
@@ -17,7 +21,7 @@ import CampusHelper from "./CampusHelper";
 import Planner from "./Planner";
 import StudentCourses from "./course/StudentCourses";
 
-export type Tab = "home" | "courses" | "study" | "campus" | "planner";
+export type Tab = "home" | "courses" | "study" | "campus" | "planner" | "progress" | "publications";
 
 const NAV: { id: Tab; label: string; icon: IconName; subtitle: string }[] = [
   { id: "home", label: "Overview", icon: "home", subtitle: "Your day at a glance" },
@@ -25,7 +29,28 @@ const NAV: { id: Tab; label: string; icon: IconName; subtitle: string }[] = [
   { id: "study", label: "Study Assistant", icon: "study", subtitle: "Chat, summarize notes, flashcards, and quizzes" },
   { id: "campus", label: "Campus Helper", icon: "campus", subtitle: "Courses, events, and facilities" },
   { id: "planner", label: "Planner", icon: "planner", subtitle: "AI study plan, assignments, and timetable" },
+  { id: "progress", label: "My progress", icon: "sparkle", subtitle: "Your open and study streaks and activity history" },
+  { id: "publications", label: "Publications", icon: "courses", subtitle: "Articles and research papers from across campus" },
 ];
+
+function useStreaks(userId: string) {
+  const [streaks, setStreaks] = useState<Streaks | null>(null);
+  useEffect(() => {
+    recordActivity("open", localDay()).then(setStreaks).catch(() => {});
+    const key = `campusai.studied.${userId}`;
+    const onStudy = () => {
+      const day = localDay();
+      if (localStorage.getItem(key) === day) return;
+      localStorage.setItem(key, day);
+      recordActivity("study", day)
+        .then(setStreaks)
+        .catch(() => localStorage.removeItem(key));
+    };
+    window.addEventListener(STUDY_EVENT, onStudy);
+    return () => window.removeEventListener(STUDY_EVENT, onStudy);
+  }, [userId]);
+  return streaks;
+}
 
 function useDeadlineNotifications(userId: string) {
   useEffect(() => {
@@ -40,11 +65,12 @@ function useDeadlineNotifications(userId: string) {
   }, [userId]);
 }
 
-export default function Dashboard({ user, campus, teachers, work }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; work: StudentCourseWork }) {
+export default function Dashboard({ user, campus, teachers, work, publications }: { user: PublicUser; campus: StoredCampusEntry[]; teachers: PublicUser[]; work: StudentCourseWork; publications: PublicationsView }) {
   const [tab, setTab] = useState<Tab>("home");
   const [mode, setMode] = useState<AiMode | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   useDeadlineNotifications(user.id);
+  const streaks = useStreaks(user.id);
 
   useEffect(() => {
     fetch("/api/ai")
@@ -63,6 +89,7 @@ export default function Dashboard({ user, campus, teachers, work }: { user: Publ
   return (
     <StorageScope.Provider value={user.id}>
     <CourseDeadlines.Provider value={deadlines}>
+    <StreakContext.Provider value={streaks}>
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0">
         <div className="flex items-center gap-2 px-5 py-5">
@@ -121,13 +148,16 @@ export default function Dashboard({ user, campus, teachers, work }: { user: Publ
           <h1 className="text-3xl font-semibold">{current.label}</h1>
           <p className="text-sm text-slate-500">{current.subtitle}</p>
         </header>
-        {tab === "home" && <Home user={user} campus={campus} teachers={teachers} onNavigate={setTab} />}
+        {tab === "home" && <Home user={user} campus={campus} teachers={teachers} announcements={work.announcements} onNavigate={setTab} />}
         {tab === "courses" && <StudentCourses user={user} work={work} />}
         {tab === "study" && <StudyAssistant />}
         {tab === "campus" && <CampusHelper campus={campus} />}
         {tab === "planner" && <Planner />}
+        {tab === "progress" && <StreakView streaks={streaks} />}
+        {tab === "publications" && <Publications view={publications} />}
       </main>
     </div>
+    </StreakContext.Provider>
     </CourseDeadlines.Provider>
     </StorageScope.Provider>
   );

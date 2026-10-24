@@ -2,23 +2,27 @@
 
 import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
-import { addAssignment, addMaterial, addQuiz, deleteAssignment, deleteMaterial, deleteQuiz, gradeSubmission } from "@/app/actions/course";
+import { addAssignment, addMaterial, addQuiz, deleteAssignment, deleteMaterial, deleteQuiz, gradeSubmission, addAnnouncement, addStudyPlan, deleteAnnouncement, deleteStudyPlan } from "@/app/actions/course";
 import { callAi } from "@/lib/api";
 import { ACCEPT, MAX_UPLOAD_MB } from "@/lib/coursework";
 import { formatDateTime, relativeTime } from "@/lib/planner";
-import type { CourseAssignment, CourseMaterial, CourseQuiz, PublicUser, QuizAttempt, QuizQuestion, Submission, TeacherCourseWork } from "@/lib/types";
+import type { CourseAssignment, CourseMaterial, CourseQuiz, PublicUser, QuizAttempt, QuizQuestion, Submission, TeacherCourseWork, Announcement, Streaks, StudyPlan } from "@/lib/types";
 import FileLink from "./FileLink";
 import { useUploadForm } from "./useUploadForm";
 
-type Tab = "materials" | "assignments" | "quizzes";
+type Tab = "materials" | "assignments" | "quizzes" | "announcements" | "plans" | "gradebook";
+type StudentStreaks = Record<string, Pick<Streaks, "open" | "study">>;
 
-export default function CourseManager({ course, work, students, back }: { course: string; work: TeacherCourseWork; students: PublicUser[]; back: { href: string; label: string } }) {
+export default function CourseManager({ course, work, students, streaks, back }: { course: string; work: TeacherCourseWork; students: PublicUser[]; streaks: StudentStreaks; back: { href: string; label: string } }) {
   const [tab, setTab] = useState<Tab>("materials");
   const toGrade = work.assignments.reduce((n, a) => n + a.submissions.filter((s) => !s.grade).length, 0);
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "materials", label: "Materials", count: work.materials.length },
     { id: "assignments", label: "Assignments", count: work.assignments.length },
     { id: "quizzes", label: "Quizzes", count: work.quizzes.length },
+    { id: "announcements", label: "Announcements", count: work.announcements.length },
+    { id: "plans", label: "Study plans", count: work.plans.length },
+    { id: "gradebook", label: "Gradebook & progress", count: students.length },
   ];
 
   return (
@@ -41,12 +45,12 @@ export default function CourseManager({ course, work, students, back }: { course
         </dl>
       </section>
 
-      <nav className="flex gap-1 border-b border-slate-200">
+      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${tab === t.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition ${tab === t.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
           >
             {t.label} <span className="ml-1 text-xs text-slate-400">{t.count}</span>
           </button>
@@ -56,6 +60,9 @@ export default function CourseManager({ course, work, students, back }: { course
       {tab === "materials" && <Materials course={course} items={work.materials} />}
       {tab === "assignments" && <Assignments course={course} items={work.assignments} students={students} />}
       {tab === "quizzes" && <Quizzes course={course} items={work.quizzes} students={students} />}
+      {tab === "announcements" && <Announcements course={course} items={work.announcements} />}
+      {tab === "plans" && <Plans course={course} items={work.plans} students={students} />}
+      {tab === "gradebook" && <Gradebook course={course} work={work} students={students} streaks={streaks} />}
     </main>
   );
 }
@@ -452,5 +459,260 @@ function QuizBuilder({ course }: { course: string }) {
       </div>
       {state && <Notice state={state} />}
     </section>
+  );
+}
+
+function Announcements({ course, items }: { course: string; items: Announcement[] }) {
+  const [state, action, pending] = useActionState(addAnnouncement, undefined);
+  return (
+    <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
+      <form action={action} key={state?.success ? items.length : "form"} className="card h-fit space-y-3 p-5">
+        <h2 className="text-xl font-semibold">Post an announcement</h2>
+        <input type="hidden" name="course" value={course} />
+        <input name="title" placeholder="Title, e.g. Midterm moved to Friday" className="input w-full" aria-label="Announcement title" required maxLength={150} />
+        <textarea name="body" placeholder="Message to your students" className="input w-full" rows={5} aria-label="Announcement message" required maxLength={3000} />
+        <Notice state={state} />
+        <button disabled={pending} className="btn-primary">
+          {pending ? "Posting…" : "Post announcement"}
+        </button>
+      </form>
+      <div className="space-y-3">
+        {items.length === 0 && <p className="card p-5 text-sm text-slate-400">No announcements yet. Students see them on their home page and in My courses.</p>}
+        {items.map((a) => (
+          <article key={a.id} className="card space-y-2 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold">{a.title}</h3>
+              <DeleteButton label={a.title} onDelete={() => deleteAnnouncement(a.id)} />
+            </div>
+            <p className="text-sm whitespace-pre-wrap text-slate-600">{a.body}</p>
+            <Posted item={a} />
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const emptyTask = () => ({ key: crypto.randomUUID(), text: "", due: "" });
+
+function Plans({ course, items, students }: { course: string; items: StudyPlan[]; students: PublicUser[] }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [tasks, setTasks] = useState([emptyTask(), emptyTask(), emptyTask()]);
+  const [state, setState] = useState<{ error?: string; success?: string }>();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState<string | null>(null);
+  const setTask = (key: string, patch: Partial<{ text: string; due: string }>) => setTasks((list) => list.map((t) => (t.key === key ? { ...t, ...patch } : t)));
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    start(async () => {
+      const res = await addStudyPlan({ course, title, description, studentId, tasks: tasks.map(({ text, due }) => ({ text, due })) });
+      setState(res);
+      if (res?.success) {
+        setTitle("");
+        setDescription("");
+        setTasks([emptyTask(), emptyTask(), emptyTask()]);
+      }
+    });
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
+      <form onSubmit={submit} className="card h-fit space-y-3 p-5">
+        <h2 className="text-xl font-semibold">Create a study plan</h2>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, e.g. Week 6 revision plan" className="input w-full" aria-label="Plan title" required maxLength={150} />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Goals and advice (optional)" className="input w-full" rows={3} aria-label="Plan description" />
+        <select value={studentId} onChange={(e) => setStudentId(e.target.value)} className="input w-full" aria-label="Plan for">
+          <option value="">Whole course ({students.length} students)</option>
+          {students.map((s) => (
+            <option key={s.id} value={s.id}>
+              Only {s.name}
+            </option>
+          ))}
+        </select>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Tasks</p>
+          {tasks.map((t, i) => (
+            <div key={t.key} className="flex gap-2">
+              <input value={t.text} onChange={(e) => setTask(t.key, { text: e.target.value })} placeholder={`Task ${i + 1}`} className="input flex-1" aria-label={`Task ${i + 1}`} maxLength={200} />
+              <input type="date" value={t.due} onChange={(e) => setTask(t.key, { due: e.target.value })} className="input w-36" aria-label={`Task ${i + 1} date`} />
+            </div>
+          ))}
+          <button type="button" onClick={() => setTasks((l) => [...l, emptyTask()])} disabled={tasks.length >= 40} className="chip disabled:opacity-50">
+            {tasks.length >= 40 ? "40 tasks max" : "+ Add task"}
+          </button>
+        </div>
+        {state && <Notice state={state} />}
+        <button disabled={pending} className="btn-primary">
+          {pending ? "Saving…" : "Share plan"}
+        </button>
+      </form>
+      <div className="space-y-3">
+        {items.length === 0 && <p className="card p-5 text-sm text-slate-400">No plans yet. Plans appear in students&apos; My courses tab, and dated tasks show up in their deadlines.</p>}
+        {items.map((p) => {
+          const audience = p.studentId ? students.filter((s) => s.id === p.studentId) : students;
+          const finished = audience.filter((s) => (p.done[s.id]?.length ?? 0) >= p.tasks.length).length;
+          return (
+            <article key={p.id} className="card space-y-2 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">{p.title}</h3>
+                  <p className="text-xs text-slate-500">
+                    {p.studentId ? `For ${p.studentName}` : "Whole course"} · {p.tasks.length} tasks · {finished}/{audience.length} finished
+                  </p>
+                </div>
+                <DeleteButton label={p.title} onDelete={() => deleteStudyPlan(p.id)} />
+              </div>
+              {p.description && <p className="text-sm whitespace-pre-wrap text-slate-600">{p.description}</p>}
+              <ul className="list-inside list-disc text-sm text-slate-600">
+                {p.tasks.map((t) => (
+                  <li key={t.id}>
+                    {t.text}
+                    {t.due && <span className="text-xs text-slate-400"> · {t.due}</span>}
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => setOpen(open === p.id ? null : p.id)} className="text-xs font-medium text-indigo-700 hover:underline">
+                {open === p.id ? "Hide progress" : "Student progress"}
+              </button>
+              {open === p.id && (
+                <ul className="divide-y divide-slate-100 text-sm">
+                  {audience.map((s) => {
+                    const n = p.done[s.id]?.length ?? 0;
+                    return (
+                      <li key={s.id} className="flex justify-between py-1.5">
+                        <span>{s.name}</span>
+                        <span className={n >= p.tasks.length ? "text-emerald-700" : "text-slate-500"}>
+                          {n}/{p.tasks.length}
+                        </span>
+                      </li>
+                    );
+                  })}
+                  {audience.length === 0 && <li className="py-1.5 text-slate-400">No students.</li>}
+                </ul>
+              )}
+              <Posted item={p} />
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// "18", "18/20" or "90%" become a fraction of the assignment's points; letter grades are shown but not averaged.
+function gradeFraction(grade: string | undefined, points: number): number | null {
+  const m = grade?.trim().match(/^(\d+(?:\.\d+)?)\s*(%|\/\s*(\d+(?:\.\d+)?))?$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const out = m[2] === "%" ? n / 100 : n / (m[3] ? Number(m[3]) : points || 100);
+  return Number.isFinite(out) ? Math.min(out, 1.5) : null;
+}
+
+function Gradebook({ course, work, students, streaks }: { course: string; work: TeacherCourseWork; students: PublicUser[]; streaks: StudentStreaks }) {
+  const now = Date.now();
+  const rows = [...students]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((s) => {
+      const fractions: number[] = [];
+      let missing = 0;
+      const cells = [
+        ...work.assignments.map((a) => {
+          const sub = a.submissions.find((x) => x.studentId === s.id);
+          const f = gradeFraction(sub?.grade, a.points);
+          if (f !== null) fractions.push(f);
+          if (!sub && new Date(a.due).getTime() < now) missing++;
+          return sub ? (sub.grade ?? "Submitted") : new Date(a.due).getTime() < now ? "Missing" : "";
+        }),
+        ...work.quizzes.map((q) => {
+          const t = q.attempts.find((x) => x.studentId === s.id);
+          if (t) fractions.push(t.total ? t.score / t.total : 0);
+          else if (q.due && new Date(q.due).getTime() < now) missing++;
+          return t ? `${t.score}/${t.total}` : q.due && new Date(q.due).getTime() < now ? "Missing" : "";
+        }),
+      ];
+      const avg = fractions.length ? Math.round((fractions.reduce((x, y) => x + y, 0) / fractions.length) * 100) : null;
+      return { s, cells, avg, missing, streak: streaks[s.id] };
+    });
+  const columns = [...work.assignments.map((a) => `${a.title} (/${a.points})`), ...work.quizzes.map((q) => `Quiz: ${q.title}`)];
+
+  const exportCsv = () => {
+    const esc = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["Student", "Email", ...columns, "Average %", "Missing", "Study streak", "Best study streak", "Days studied"];
+    const lines = rows.map((r) => [r.s.name, r.s.email, ...r.cells, r.avg ?? "", r.missing, r.streak?.study.current ?? 0, r.streak?.study.best ?? 0, r.streak?.study.total ?? 0].map(esc).join(","));
+    const blob = new Blob([[header.map(esc).join(","), ...lines].join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${course}-gradebook-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const graded = rows.filter((r) => r.avg !== null);
+  const classAvg = graded.length ? Math.round(graded.reduce((n, r) => n + r.avg!, 0) / graded.length) : null;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {[
+          { label: "Class average", value: classAvg === null ? "—" : `${classAvg}%` },
+          { label: "Students with missing work", value: rows.filter((r) => r.missing).length },
+          { label: "Studied today or yesterday", value: rows.filter((r) => r.streak?.study.current).length },
+          { label: "Graded items", value: columns.length },
+        ].map((x) => (
+          <div key={x.label} className="card p-4">
+            <p className="text-xs text-slate-500">{x.label}</p>
+            <p className="mt-1 text-2xl font-bold">{x.value}</p>
+          </div>
+        ))}
+      </div>
+      <section className="card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+          <h2 className="text-xl font-semibold">Gradebook</h2>
+          <button onClick={exportCsv} disabled={!rows.length} className="btn-ghost">
+            Download CSV
+          </button>
+        </div>
+        {rows.length === 0 ? (
+          <p className="p-5 text-sm text-slate-400">No students enrolled yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="sticky left-0 bg-slate-50 px-4 py-2 font-medium">Student</th>
+                  {columns.map((c) => (
+                    <th key={c} className="max-w-40 truncate px-3 py-2 font-medium" title={c}>
+                      {c}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 font-medium">Average</th>
+                  <th className="px-3 py-2 font-medium">Missing</th>
+                  <th className="px-3 py-2 font-medium">Study streak</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => (
+                  <tr key={r.s.id}>
+                    <td className="sticky left-0 bg-white px-4 py-2 font-medium">{r.s.name}</td>
+                    {r.cells.map((c, i) => (
+                      <td key={i} className={`px-3 py-2 ${c === "Missing" ? "text-red-600" : c === "Submitted" ? "text-amber-700" : ""}`}>
+                        {c || "—"}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 font-semibold">{r.avg === null ? "—" : `${r.avg}%`}</td>
+                    <td className={`px-3 py-2 ${r.missing ? "text-red-600" : ""}`}>{r.missing}</td>
+                    <td className="px-3 py-2" title={`Best ${r.streak?.study.best ?? 0} · ${r.streak?.study.total ?? 0} days studied · open streak ${r.streak?.open.current ?? 0}`}>
+                      {r.streak?.study.current ?? 0} days
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

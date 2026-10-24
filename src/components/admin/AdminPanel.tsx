@@ -2,16 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { approveUser, deleteUser } from "@/app/actions/admin";
-import type { PublicUser, StoredCampusEntry } from "@/lib/types";
+import type { PublicationsView, PublicUser, StoredCampusEntry } from "@/lib/types";
+import Publications from "../progress/Publications";
 import Avatar from "../Avatar";
 import PortalHeader from "../PortalHeader";
 import RoleBadge from "../RoleBadge";
 import CampusManager from "./CampusManager";
 import UserManager from "./UserManager";
 
-type Section = "overview" | "users" | "campus";
+type Section = "overview" | "users" | "campus" | "publications";
 
-export default function AdminPanel({ admin, users, campus }: { admin: PublicUser; users: PublicUser[]; campus: StoredCampusEntry[] }) {
+export default function AdminPanel({ admin, users, campus, publications }: { admin: PublicUser; users: PublicUser[]; campus: StoredCampusEntry[]; publications: PublicationsView }) {
   const [section, setSection] = useState<Section>("overview");
   const [pendingAction, startTransition] = useTransition();
   const awaiting = users.filter((u) => u.status === "pending");
@@ -34,6 +35,7 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
     { id: "overview", label: "Overview" },
     { id: "users", label: `Users (${users.length})` },
     { id: "campus", label: `Campus content (${campus.length})` },
+    { id: "publications", label: publications.toReview.length ? `Publications (${publications.toReview.length} to review)` : "Publications" },
   ];
 
   return (
@@ -73,6 +75,8 @@ export default function AdminPanel({ admin, users, campus }: { admin: PublicUser
             </button>
           ))}
         </div>
+
+        {section === "publications" && <Publications view={publications} canDeleteAny />}
 
         {section === "overview" && (
           <div className="space-y-6">

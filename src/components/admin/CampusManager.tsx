@@ -1,5 +1,6 @@
 "use client";
 
+import { useUploadForm } from "@/components/course/useUploadForm";
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { deleteCampusEntry, saveCampusEntry } from "@/app/actions/admin";
 import { callAi } from "@/lib/api";
@@ -91,6 +92,7 @@ export default function CampusManager({ entries }: { entries: StoredCampusEntry[
 
 function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone: (message?: string) => void }) {
   const [state, action, pending] = useActionState(saveCampusEntry, undefined);
+  const upload = useUploadForm(action, state, { purpose: "campus" });
   const [category, setCategory] = useState<CampusCategory>(entry?.category ?? "event");
   const [title, setTitle] = useState(entry?.title ?? "");
   const [details, setDetails] = useState(entry?.details ?? "");
@@ -119,7 +121,7 @@ function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone:
   }, [state, onDone]);
 
   return (
-    <form action={action} className="card h-fit space-y-3 p-5">
+    <form ref={upload.formRef} onSubmit={upload.onSubmit} className="card h-fit space-y-3 p-5">
       <h3 className="section-title">{entry ? "Edit entry" : "Add campus entry"}</h3>
       {entry && <input type="hidden" name="id" value={entry.id} />}
       <div className="grid grid-cols-2 gap-3">
@@ -142,10 +144,25 @@ function EntryForm({ entry, onDone }: { entry: StoredCampusEntry | null; onDone:
       {aiError && <p className="text-xs text-red-600">{aiError}</p>}
       <textarea name="details" value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Details (hours, location, description…)" required rows={5} className="input w-full resize-y" aria-label="Details" />
       <input name="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags, comma separated (helps search)" className="input w-full" aria-label="Tags" />
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <div className="space-y-2">
+        <label className="block text-xs font-medium text-slate-500">
+          Picture (optional, up to 10 MB)
+          <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" className="input mt-1 w-full" aria-label="Picture" />
+        </label>
+        {entry?.image && (
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/files/${entry.image.id}`} alt="" className="h-14 w-20 rounded object-cover" />
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input type="checkbox" name="removeImage" /> Remove current picture
+            </label>
+          </div>
+        )}
+      </div>
+      {(upload.error || state?.error) && <p className="text-sm text-red-600">{upload.error || state?.error}</p>}
       <div className="flex gap-2">
-        <button type="submit" disabled={pending} className="btn-primary">
-          {pending ? "Saving…" : entry ? "Save changes" : "Add entry"}
+        <button type="submit" disabled={pending || upload.uploading} className="btn-primary">
+          {upload.uploading ? "Uploading…" : pending ? "Saving…" : entry ? "Save changes" : "Add entry"}
         </button>
         {entry && (
           <button type="button" onClick={() => onDone()} className="btn-ghost">
